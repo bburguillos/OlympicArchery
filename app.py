@@ -4,6 +4,7 @@ import math
 import hmac
 import random
 import secrets
+import time
 from base64 import b64encode
 from pathlib import Path
 
@@ -60,6 +61,9 @@ st.markdown("""
 .podium-2{height:92px;background:linear-gradient(135deg,#ecf3fb,#889cac)}
 .podium-3{height:65px;background:linear-gradient(135deg,#f0bf8a,#9c632f)}
 @media(max-width:620px){.hero{padding:22px 19px}.podium-stage{gap:4px;padding:16px 4px 8px}.podium-entry .archer{font-size:10px}.podium-entry .score{font-size:17px}.country-card .country{font-size:25px}}
+.drama-strip{border-radius:12px;background:linear-gradient(100deg,#53191c,#a34218,#402146);color:white;
+  text-align:center;font-size:clamp(16px,2.5vw,26px);font-weight:900;padding:11px 13px;
+  letter-spacing:.5px;margin:6px 0 12px;box-shadow:0 6px 18px rgba(0,0,0,.2)}
 </style>
 """, unsafe_allow_html=True)
 # Asset banners are cropped so no fixed sample scores or athlete names appear.
@@ -445,6 +449,37 @@ def target_svg(shots, radius=54):
     return ''.join(bits)
 
 
+def drama_summary(state):
+    """One-line live update based only on revealed arrows."""
+    events=[]
+    for m in state["matches"]:
+        if m["bye"] or not m["last_reveal"]:
+            continue
+        a,b=(BY_CODE[c] for c in m["codes"])
+        pair=m["last_reveal"]
+        if pair[0] != pair[1]:
+            scorer = a if pair[0] else b
+            events.append(f'{scorer["flag"]} {scorer["country"]} lands a perfect 10!')
+        if m["resolved"]:
+            w=BY_CODE[m["winner"]]
+            events.append(f'🏆 {w["flag"]} {w["country"]} advances!')
+    return '  •  '.join(events[:4]) if events else 'Both archers hold steady — no new perfect 10 advantage.'
+
+
+def round_drama(state):
+    live=[m for m in state["matches"] if not m["resolved"] and not m["bye"]]
+    if not live:
+        return '🏁 ROUND COMPLETE — READY TO ADVANCE'
+    if any(m["shootout"] for m in live):
+        return '⚡ SUDDEN DEATH — EVERY ARROW COULD DECIDE IT!'
+    remaining=min(max(0,MATCH_ARROWS-len(m["shots"][0])) for m in live)
+    if remaining==1:
+        return '🔥 FINAL ARROW — THE MEDAL DREAMS ARE ON THE LINE!'
+    if remaining<=3:
+        return f'🔥 FINAL {remaining} ARROWS — THE PRESSURE IS ON!'
+    return f'🏹 {remaining} ARROWS REMAIN IN THE ROUND'
+
+
 def one_match_html(m, idx):
     if m["bye"]:
         a = BY_CODE[m["winner"]]
@@ -465,12 +500,14 @@ def one_match_html(m, idx):
             <div class="score">{sum(s[:MATCH_ARROWS])} <span>/ {min(len(s),MATCH_ARROWS)}</span></div>
             <div class="last">LAST: {last}</div>
         </div>""")
+    score0,score1=(sum(sh[:MATCH_ARROWS]) for sh in m['shots'])
+    leader = ('TIED' if score0==score1 else 'LEADS: '+ html.escape(BY_CODE[m['codes'][0 if score0>score1 else 1]]['country']))
     status = ('🏁 WINNER: ' + html.escape(BY_CODE[m['winner']]['country'])
               if m["resolved"] else '⚡ SHOOT-OFF' if m["shootout"] else
               f'ARROW {len(m["shots"][0]) + 1} OF {MATCH_ARROWS}')
     return (f'<div class="match"><div class="match-label">{html.escape(m["title"])}</div>'
             '<div class="competitors">' + ''.join(cards) + '</div>'
-            f'<div class="status">{status}</div></div>')
+            f'<div class="status">{status}</div><div class="leader">{leader}</div></div>')
 
 
 def broadcast_grid(state):
@@ -488,6 +525,9 @@ def broadcast_grid(state):
     st.markdown(f"""<div class="broadcast-banner"><div class="sub">OLYMPIC PROBABILITY ARENA · LIVE</div>
         <div class="big">{label}</div><div class="sub">{bottom} · {len(unresolved)} MATCH(ES) STILL LIVE</div></div>""",
         unsafe_allow_html=True)
+    st.markdown(f'<div class="drama-strip">{html.escape(round_drama(state))}</div>', unsafe_allow_html=True)
+    if state.get('last_action',0):
+        st.caption(drama_summary(state))
     # A single embedded grid prevents Streamlit elements/iframes from stretching the screen.
     cols = 2 if n >= 2 else 1
     html_doc = f"""<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -506,6 +546,9 @@ def broadcast_grid(state):
     .score{{font-size:25px;font-weight:900;line-height:26px;color:#fff}}
     .score span{{color:#9cbed0;font-size:13px}}.last{{font-size:10px;color:#bbd7e7}}
     .status{{text-align:center;color:#f5ca8a;font-size:11px;font-weight:800;padding:5px 1px 1px}}
+    .leader{{font-size:11px;text-align:center;color:#7fe9c3;font-weight:900;margin-top:3px}}
+    .winner .score{{color:#fbd37d;text-shadow:0 0 12px #d49c31}}
+    .athlete:has(.last){{transition:all .2s ease}}
     .bye{{font-size:18px;text-align:center;padding:70px 5px 80px}}
     @media(max-width:600px){{.grid{{grid-template-columns:1fr}}}}
     </style></head><body><div class="grid">"""+ ''.join(one_match_html(m,i) for i,m in enumerate(matches)) + '</div></body></html>'
@@ -604,6 +647,8 @@ def teacher_mode():
             show_banner("bracket")
         if st.button('🏁 Create Olympic Tournament',type='primary',disabled=len(selected)<2):
             st.session_state.live_bracket=start_bracket([choices[x] for x in selected])
+            st.session_state.v7_playing=False
+            st.session_state.v7_last_fire=time.monotonic()
             st.rerun()
         return
     top1,top2 = st.columns([4,1])
@@ -613,32 +658,68 @@ def teacher_mode():
     with top2:
         if st.button('End Tournament'):
             st.session_state.live_bracket=None
+            st.session_state.v7_playing=False
             st.rerun()
-    if state['phase']=='complete':
-        ceremony_reveal_v5(state)
-    else:
-        broadcast_grid(state)
-        if round_finished(state):
-            if st.button('➡️ ADVANCE ALL WINNERS',type='primary',use_container_width=True):
-                finish_round(state)
+    # Controls live outside the automatically rerun broadcast fragment.
+    if state['phase'] != 'complete':
+        st.session_state.setdefault('v7_speed', 4)
+        speed = st.select_slider('🎬 Automatic arrow speed',
+                                 options=[2,4,6], value=st.session_state['v7_speed'],
+                                 format_func=lambda x: f'{x} seconds', key='v7_speed_slider',
+                                 on_change=lambda: st.session_state.update(v7_speed=st.session_state.v7_speed_slider))
+        controls=st.columns([1,1,2])
+        with controls[0]:
+            if st.button('⏯ Pause' if st.session_state.get('v7_playing',False) else '▶ Autoplay',
+                         type='primary',use_container_width=True):
+                playing=not st.session_state.get('v7_playing',False)
+                st.session_state.v7_playing=playing and not round_finished(state)
+                st.session_state.v7_last_fire=time.monotonic()
                 st.rerun()
-        else:
-            unresolved = [m for m in state['matches'] if not m['resolved']]
-            shootouts = any(m['shootout'] for m in unresolved)
-            label = '⚡ RELEASE SHOOT-OFF ARROWS' if shootouts else '🏹 RELEASE ALL ARROWS · NEXT ROUND'
-            if st.button(label,type='primary',use_container_width=True):
+        with controls[1]:
+            if st.button('🏹 One arrow',use_container_width=True,
+                         disabled=round_finished(state) or st.session_state.get('v7_playing',False)):
                 advance_all_arrows(state)
+                state['last_action']=state.get('last_action',0)+1
+                st.session_state.v7_last_fire=time.monotonic()
                 st.rerun()
-            # A multi-shot control is useful when the classroom needs to move quickly.
-            if not shootouts:
-                if st.button('⏩ FAST-FORWARD 3 ARROWS',use_container_width=True):
-                    for _ in range(3):
-                        if round_finished(state):
-                            break
-                        advance_all_arrows(state)
-                    st.rerun()
-            if any(m['resolved'] for m in state['matches']):
-                st.caption('Finished matches remain frozen while other matches finish their arrows or shoot-offs.')
+        with controls[2]:
+            st.caption('Autoplay shoots one arrow per active country each interval. '
+                       'The final arrow gets a longer dramatic pause. Pause anytime.')
+
+    @st.fragment(run_every=(f'{st.session_state.get("v7_speed",4)}s'
+                            if st.session_state.get('v7_playing',False) and state['phase']!='complete'
+                            else None))
+    def championship_live_view():
+        live_state=st.session_state.get('live_bracket')
+        if live_state is None:
+            return
+        playing=st.session_state.get('v7_playing',False)
+        if live_state['phase']!='complete' and playing and not round_finished(live_state):
+            now=time.monotonic()
+            speed=st.session_state.get('v7_speed',4)
+            remaining=[MATCH_ARROWS-len(m['shots'][0]) for m in live_state['matches']
+                       if not m['resolved'] and not m['shootout'] and not m['bye']]
+            # Hold the final arrow an extra beat; the next refresh triggers its release.
+            interval = speed*1.5 if remaining and min(remaining)==1 else speed
+            if now-st.session_state.get('v7_last_fire',now) >= interval-0.12:
+                advance_all_arrows(live_state)
+                live_state['last_action']=live_state.get('last_action',0)+1
+                st.session_state.v7_last_fire=now
+        if live_state['phase']=='complete':
+            ceremony_reveal_v5(live_state)
+            return
+        broadcast_grid(live_state)
+        if round_finished(live_state):
+            st.session_state.v7_playing=False
+            st.success('🏁 All matches in this round are decided!')
+            if st.button('➡️ Advance all winners',type='primary',use_container_width=True,key='v7_advance'):
+                finish_round(live_state)
+                st.session_state.v7_last_fire=time.monotonic()
+                st.rerun()
+        elif st.session_state.get('v7_playing',False):
+            st.info('🔴 LIVE • Automatic arrows releasing. Press Pause above to take control.')
+
+    championship_live_view()
     with st.expander('🏅 View live bracket and countries', expanded=False):
         dynamic_bracket(state)
     with st.expander('📋 Completed rounds and results'):
