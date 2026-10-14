@@ -85,15 +85,25 @@ def student_mode():
         st.session_state.training_shots = []
         st.session_state.training_prediction = None
         st.session_state.training_started = False
+        st.session_state.student_stage = "🔐 Probability Check"
+        st.session_state.athlete_unlocked = False
     st.write(f'**Athlete:** {a["athlete"]}  ·  **Country:** {a["flag"]} {a["country"]}  ·  **Competition:** Paris 2024 men’s individual recurve ranking round')
-    t1,t2,t3 = st.tabs(["🔐 Probability Check", "🏹 Training Camp", "📋 Results & Reflection"])
-    with t1:
+    stages = ["🔐 Probability Check", "🏹 Training Camp", "📋 Results & Reflection"]
+    if "student_stage" not in st.session_state:
+        st.session_state.student_stage = stages[0]
+    stage = st.radio("Your next step", stages, key="student_stage", horizontal=True)
+    if stage == stages[0]:
         unlocked = check_panel(a, "my")
         st.markdown("**Further worksheet questions:** Calculate P(not a 10), then predict how many perfect 10s you expect in 20 arrows.")
         st.caption("We never change the athlete's underlying real-data probability when a student enters an answer.")
-    with t2:
+        if unlocked:
+            st.session_state.athlete_unlocked = True
+            st.success("✅ Athlete unlocked! You're ready to practice.")
+            st.button("🏹 Continue to Training Camp →", type="primary", use_container_width=True, on_click=lambda: st.session_state.update(student_stage=stages[1]))
+    elif stage == stages[1]:
+        unlocked = st.session_state.get("athlete_unlocked", False)
         if not unlocked:
-            st.info("Complete the Probability Check tab first.")
+            st.info("Complete the Probability Check first.")
         else:
             if not st.session_state.get("training_started",False):
                 prediction = st.number_input("Predict perfect 10s in 10 training arrows",min_value=0,max_value=10,value=5,step=1,key="predict10")
@@ -123,7 +133,7 @@ def student_mode():
                         st.session_state.training_shots=[]
                         st.session_state.training_prediction=None
                         st.rerun()
-    with t3:
+    else:  # Results & Reflection
         shots=st.session_state.get("training_shots",[])
         if not shots:
             st.info("Complete training to see your results here.")
