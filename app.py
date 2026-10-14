@@ -4,6 +4,7 @@ import math
 import hmac
 import random
 import secrets
+from base64 import b64encode
 from pathlib import Path
 
 import streamlit as st
@@ -12,6 +13,7 @@ import streamlit.components.v1 as components
 st.set_page_config(page_title="Olympic Archery | Sports by the Numbers", page_icon="🏹", layout="wide")
 
 DATA_FILE = Path(__file__).with_name("athletes.csv")
+ASSET_DIR = Path(__file__).parent / "assets"
 ARROWS_IN_CHAMPIONSHIP = 20
 
 @st.cache_data
@@ -60,8 +62,17 @@ st.markdown("""
 @media(max-width:620px){.hero{padding:22px 19px}.podium-stage{gap:4px;padding:16px 4px 8px}.podium-entry .archer{font-size:10px}.podium-entry .score{font-size:17px}.country-card .country{font-size:25px}}
 </style>
 """, unsafe_allow_html=True)
-st.markdown('<div class="hero"><div class="eyebrow">DOVER TIGERS · SPORTS BY THE NUMBERS</div><div class="huge">🏹 ROAD TO GOLD</div><div class="subtitle">OLYMPIC ARCHERY CHAMPIONSHIP · Paris 2024 probability lab</div></div>', unsafe_allow_html=True)
-st.caption("Olympic results determine the model probability. Every in-app arrow and medal result is a new classroom simulation, not an Olympic replay.")
+# Asset banners are cropped so no fixed sample scores or athlete names appear.
+# Streamlit controls remain real, accessible widgets below the images.
+def show_banner(name, max_height=None):
+    path = ASSET_DIR / (name + "_banner.webp")
+    if path.exists():
+        st.image(str(path), use_container_width=True)
+    else:
+        st.info("Broadcast image missing: add the assets folder to your repository.")
+
+show_banner("opening")
+st.caption("Sports by the Numbers • Historical Paris 2024 perfect-10 rates determine the simulation. All tournament results are fictional classroom outcomes.")
 
 
 def country_card(a):
@@ -463,6 +474,8 @@ def one_match_html(m, idx):
 
 
 def broadcast_grid(state):
+    if st.session_state.get("v6_broadcast_art", True):
+        show_banner("match" if state["phase"] != "medals" else "medals")
     matches = state["matches"]
     n = len(matches)
     label = ("MEDAL MATCHES" if state["phase"] == "medals" else
@@ -501,9 +514,32 @@ def broadcast_grid(state):
     components.html(html_doc, height=rows*300+20, scrolling=False)
 
 
+def dynamic_bracket(state):
+    """Actual match list, never static image team labels."""
+    st.markdown("### 🏆 Current tournament bracket")
+    if st.session_state.get("v6_broadcast_art", True):
+        show_banner("bracket")
+    cols = st.columns(2 if len(state["matches"])>1 else 1)
+    for index, match in enumerate(state["matches"]):
+        labels = []
+        for code in match["codes"]:
+            a=BY_CODE.get(code)
+            labels.append(f'{a["flag"]} {a["country"]}' if a else 'BYE')
+        status = (f'✅ {BY_CODE[match["winner"]]["country"]} advances'
+                  if match["resolved"] else '⏳ In progress')
+        with cols[index % len(cols)]:
+            st.markdown(f'**{match["title"]}**  \n{labels[0]} vs {labels[1]}  \n{status}')
+    with st.expander("Completed-round bracket history", expanded=False):
+        for entry in state["history"]:
+            winner=BY_CODE[entry["winner"]]
+            st.write(f'{entry["title"]}: {winner["flag"]} {winner["country"]} advances')
+
+
 def ceremony_reveal_v5(state):
     step = state["ceremony_step"]
     medals = state["medals"]
+    if st.session_state.get("v6_broadcast_art", True):
+        show_banner("medals")
     st.title('🏟️ OLYMPIC MEDAL CEREMONY')
     def medal_line(key, symbol):
         a = BY_CODE[medals[key]]
@@ -564,6 +600,8 @@ def teacher_mode():
         selected = st.multiselect('Choose competing countries (2–24)',list(choices),
                                   default=list(choices)[:8],key='bracket_competitors')
         st.caption('All matches in each knockout round run simultaneously. Byes advance automatically.')
+        if st.session_state.get("v6_broadcast_art", True):
+            show_banner("bracket")
         if st.button('🏁 Create Olympic Tournament',type='primary',disabled=len(selected)<2):
             st.session_state.live_bracket=start_bracket([choices[x] for x in selected])
             st.rerun()
@@ -601,6 +639,8 @@ def teacher_mode():
                     st.rerun()
             if any(m['resolved'] for m in state['matches']):
                 st.caption('Finished matches remain frozen while other matches finish their arrows or shoot-offs.')
+    with st.expander('🏅 View live bracket and countries', expanded=False):
+        dynamic_bracket(state)
     with st.expander('📋 Completed rounds and results'):
         for event in state['history']:
             a=BY_CODE[event['winner']]
@@ -616,7 +656,9 @@ def teacher_mode():
                'p = Olympic athlete perfect 10s / 72. The positions of arrow marks are illustrative.')
 
 
-mode = st.radio('App mode',['🎓 Student Training','🏆 Teacher Championship'],horizontal=True)
+st.toggle('🎬 Cinematic Broadcast Graphics (turn off for compact view)',
+          value=True, key='v6_broadcast_art')
+mode = st.radio('App mode' ,['🎓 Student Training','🏆 Teacher Championship'],horizontal=True)
 if mode.startswith('🎓'):
     student_mode()
 else:
