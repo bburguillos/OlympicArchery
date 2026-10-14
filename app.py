@@ -17,12 +17,18 @@ st.set_page_config(
 )
 
 DATA_FILE = Path(__file__).with_name("athletes.csv")
-ARROWS_IN_CHAMPIONSHIP = 20
+MATCH_ARROWS = 10
 
+
+# ==================================================
+# ATHLETE DATABASE
+# ==================================================
 
 @st.cache_data
 def load_athletes():
-    with DATA_FILE.open(encoding="utf-8", newline="") as handle:
+    with DATA_FILE.open(
+        encoding="utf-8", newline=""
+    ) as handle:
         records = list(csv.DictReader(handle))
 
     for a in records:
@@ -37,56 +43,45 @@ ATHLETES = load_athletes()
 BY_CODE = {a["code"]: a for a in ATHLETES}
 
 
-# --------------------------------------------------
-# VISUAL STYLING
-# --------------------------------------------------
+# ==================================================
+# VISUAL DESIGN
+# ==================================================
 
-st.markdown(
-    """
+st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=DM+Sans:wght@400;500;700&display=swap');
 
-:root {
-    --orange: #fbbf62;
-    --deep: #10233c;
-}
-
 .block-container {
-    padding-top: 1.15rem;
+    padding-top: 1.1rem;
     max-width: 1200px;
 }
 
 .hero {
     border-radius: 24px;
-    padding: 26px 30px;
+    padding: 25px 30px;
     background: linear-gradient(
-        115deg,
-        #0d1b30 0%,
-        #183953 70%,
-        #8c4b21 100%
+        115deg, #0d1b30, #183953 70%, #8c4b21
     );
-    color: #fff !important;
+    color: white !important;
     margin-bottom: 18px;
     border: 1px solid rgba(255,255,255,.16);
-    box-shadow: 0 12px 35px rgba(0,0,0,.14);
 }
 
 .hero .eyebrow {
-    font: 700 12px 'DM Sans', sans-serif;
+    font: 700 12px 'DM Sans',sans-serif;
     letter-spacing: 3px;
     color: #fbd09b;
 }
 
 .hero .huge {
     font: 900 clamp(35px,5vw,64px)
-        'Barlow Condensed', sans-serif;
-    letter-spacing: 1px;
-    line-height: 1.03;
+        'Barlow Condensed',sans-serif;
+    line-height: 1.05;
     margin: 5px 0 9px;
 }
 
 .hero .subtitle {
-    font: 500 14px 'DM Sans', sans-serif;
+    font: 500 14px 'DM Sans',sans-serif;
     color: #d9e4f0;
 }
 
@@ -99,7 +94,7 @@ st.markdown(
     margin: 12px 0;
 }
 
-.country-card .country-head {
+.country-head {
     display: flex;
     align-items: center;
     gap: 16px;
@@ -107,16 +102,14 @@ st.markdown(
 
 .country-card .flag {
     font-size: 48px;
-    line-height: 1.1;
 }
 
 .country-card .country {
-    font: 900 32px 'Barlow Condensed', sans-serif;
-    line-height: 1.15;
+    font: 900 32px 'Barlow Condensed',sans-serif;
 }
 
 .country-card .athlete {
-    font: 500 15px 'DM Sans', sans-serif;
+    font: 500 15px 'DM Sans',sans-serif;
     color: #d5e7f6;
 }
 
@@ -139,19 +132,12 @@ st.markdown(
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
     margin: 12px 0;
 }
 
 .score-strip strong {
-    font: 900 31px 'Barlow Condensed', sans-serif;
+    font: 900 31px 'Barlow Condensed',sans-serif;
     color: #ffd189;
-}
-
-.mini-history {
-    font-size: 21px;
-    letter-spacing: 6px;
-    padding: 8px 2px;
 }
 
 .podium-stage {
@@ -170,7 +156,7 @@ st.markdown(
     flex: 1;
     min-width: 0;
     text-align: center;
-    color: #fff;
+    color: white;
 }
 
 .podium-entry .flag {
@@ -183,19 +169,18 @@ st.markdown(
 
 .podium-entry .team {
     font: 800 clamp(16px,2.4vw,28px)
-        'Barlow Condensed', sans-serif;
+        'Barlow Condensed',sans-serif;
     overflow-wrap: anywhere;
 }
 
 .podium-entry .archer {
-    font: 500 12px 'DM Sans', sans-serif;
+    font-size: 12px;
     opacity: .85;
     margin-bottom: 8px;
 }
 
 .podium-entry .score {
-    font: 800 23px 'Barlow Condensed', sans-serif;
-    margin: 5px 0;
+    font: 800 23px 'Barlow Condensed',sans-serif;
 }
 
 .podium-block {
@@ -204,7 +189,7 @@ st.markdown(
     justify-content: center;
     border-radius: 10px 10px 0 0;
     color: #12263b;
-    font: 900 44px 'Barlow Condensed', sans-serif;
+    font: 900 44px 'Barlow Condensed',sans-serif;
 }
 
 .podium-1 {
@@ -223,62 +208,52 @@ st.markdown(
 }
 
 @media(max-width:620px) {
-    .hero { padding: 22px 19px; }
-    .podium-stage { gap: 4px; padding: 16px 4px 8px; }
-    .podium-entry .archer { font-size: 10px; }
-    .podium-entry .score { font-size: 17px; }
-    .country-card .country { font-size: 25px; }
+    .hero {padding:20px;}
+    .country-card .country {font-size:25px;}
+    .podium-stage {gap:4px;}
 }
 </style>
-""",
-    unsafe_allow_html=True,
-)
+""", unsafe_allow_html=True)
 
-st.markdown(
-    """
+st.markdown("""
 <div class="hero">
     <div class="eyebrow">
         DOVER TIGERS · SPORTS BY THE NUMBERS
     </div>
     <div class="huge">🏹 ROAD TO GOLD</div>
     <div class="subtitle">
-        OLYMPIC ARCHERY CHAMPIONSHIP ·
-        Paris 2024 probability lab
+        OLYMPIC ARCHERY CHAMPIONSHIP · PARIS 2024
     </div>
 </div>
-""",
-    unsafe_allow_html=True,
-)
+""", unsafe_allow_html=True)
 
 st.caption(
-    "Olympic results determine the model probability. "
-    "Every in-app arrow and medal result is a new classroom "
-    "simulation, not an Olympic replay."
+    "Real Paris 2024 statistics determine each athlete's "
+    "probability. All app competitions are simulations."
 )
 
 
-# --------------------------------------------------
+# ==================================================
 # COUNTRY CARDS
-# --------------------------------------------------
+# ==================================================
 
 def country_card(a):
     flag = html.escape(a["flag"])
     country = html.escape(a["country"])
     athlete = html.escape(a["athlete"])
 
-    st.markdown(
-        f"""
-<div class='country-card'>
-    <div class='country-head'>
-        <div class='flag'>{flag}</div>
+    st.markdown(f"""
+<div class="country-card">
+    <div class="country-head">
+        <div class="flag">{flag}</div>
         <div>
-            <div class='country'>{country}</div>
-            <div class='athlete'>
+            <div class="country">{country}</div>
+            <div class="athlete">
                 {athlete} · Paris 2024
             </div>
         </div>
     </div>
-    <div class='stats'>
+    <div class="stats">
         <span>
             🎯 PERFECT 10s:
             <b>{a["perfect_10s"]}</b>
@@ -287,28 +262,19 @@ def country_card(a):
             🏹 ARROWS SHOT:
             <b>{a["arrows"]}</b>
         </span>
-        <span>📍 MEN'S RECURVE RANKING ROUND</span>
+        <span>
+            MEN'S RECURVE RANKING ROUND
+        </span>
     </div>
 </div>
-""",
-        unsafe_allow_html=True,
-    )
+""", unsafe_allow_html=True)
 
 
-# --------------------------------------------------
-# RESPONSIVE ARCHERY TARGET
-# --------------------------------------------------
+# ==================================================
+# RESPONSIVE TARGET GRAPHICS
+# ==================================================
 
-def archery_visual(shots, heading="LIVE TARGET", compact=False):
-    """
-    Responsive target showing binary outcomes.
-
-    Green = perfect 10.
-    Orange = not a perfect 10.
-
-    Locations are illustrative, not actual arrow scores.
-    """
-
+def archery_visual(shots, heading="LIVE TARGET"):
     W, H = 560, 300
     cx, cy, rr = 143, 149, 116
 
@@ -321,43 +287,34 @@ def archery_visual(shots, heading="LIVE TARGET", compact=False):
     ]
 
     svg = [
-        (
-            f'<svg xmlns="http://www.w3.org/2000/svg" '
-            f'viewBox="0 0 {W} {H}" '
-            'style="display:block;width:100%;height:auto;'
-            'max-width:560px;margin:0 auto" '
-            'role="img" '
-            'aria-label="Archery target and simulated results">'
-        ),
-        (
-            "<style>"
-            "@keyframes arrowLand{"
-            "from{opacity:0;transform:scale(1.6)}"
-            "to{opacity:1;transform:scale(1)}"
-            "}"
-            ".latest{animation:arrowLand .55s ease-out;"
-            "transform-box:fill-box;"
-            "transform-origin:center}"
-            "</style>"
-        ),
+        f'<svg xmlns="http://www.w3.org/2000/svg" '
+        f'viewBox="0 0 {W} {H}" '
+        'style="display:block;width:100%;height:auto;'
+        'max-width:560px;margin:auto">',
+        '<style>'
+        '@keyframes land {'
+        'from{opacity:0;transform:scale(1.6)}'
+        'to{opacity:1;transform:scale(1)}}'
+        '.latest{animation:land .55s ease-out;'
+        'transform-box:fill-box;transform-origin:center}'
+        '</style>',
         f'<rect width="{W}" height="{H}" '
         'rx="17" fill="#11253e"/>',
-        (
-            f'<circle cx="{cx}" cy="{cy}" r="{rr+6}" '
-            'fill="#0a1625" stroke="#6595b2" '
-            'stroke-width="2"/>'
-        ),
+        f'<circle cx="{cx}" cy="{cy}" r="{rr+6}" '
+        'fill="#0a1625" stroke="#6595b2" '
+        'stroke-width="2"/>',
     ]
 
-    for i, col in enumerate(colors):
-        radius = rr * (1 - i * 0.19)
+    for i, color in enumerate(colors):
+        radius = rr * (1 - i * .19)
+
         svg.append(
             f'<circle cx="{cx}" cy="{cy}" '
-            f'r="{radius:.1f}" fill="{col}" '
+            f'r="{radius:.1f}" fill="{color}" '
             'stroke="#203046" stroke-width="2"/>'
         )
 
-    ten_radius = rr * 0.20
+    ten_radius = rr * .20
 
     svg.append(
         f'<circle cx="{cx}" cy="{cy}" '
@@ -365,24 +322,16 @@ def archery_visual(shots, heading="LIVE TARGET", compact=False):
         'stroke="#141719" stroke-width="2"/>'
     )
 
-    svg.append(
-        f'<circle cx="{cx}" cy="{cy}" '
-        f'r="{ten_radius*0.3:.1f}" fill="none" '
-        'stroke="#1b2127" stroke-width="1.5"/>'
-    )
-
     for i, success in enumerate(shots):
-        theta = i * 2.39996322973 + 0.4
+        theta = i * 2.39996322973 + .4
 
         if success:
-            rad = (
-                ten_radius
-                * (0.22 + 0.49 * ((i * 7) % 11) / 11)
+            rad = ten_radius * (
+                .22 + .49 * ((i * 7) % 11) / 11
             )
         else:
             rad = (
-                ten_radius
-                + 7
+                ten_radius + 7
                 + (rr - ten_radius - 20)
                 * ((i * 13 + 7) % 29) / 29
             )
@@ -392,147 +341,70 @@ def archery_visual(shots, heading="LIVE TARGET", compact=False):
 
         latest = (
             ' class="latest"'
-            if i == len(shots) - 1
-            else ""
+            if i == len(shots) - 1 else ""
         )
 
         marker = (
             "#00e4ad" if success else "#ff714b"
         )
 
-        svg.extend(
-            [
-                (
-                    f'<line{latest} '
-                    f'x1="{x-9:.1f}" y1="{y-9:.1f}" '
-                    f'x2="{x+2:.1f}" y2="{y+2:.1f}" '
-                    'stroke="#172c41" stroke-width="2.5"/>'
-                ),
-                (
-                    f'<circle{latest} '
-                    f'cx="{x:.1f}" cy="{y:.1f}" '
-                    f'r="4.5" fill="{marker}" '
-                    'stroke="#101d30" stroke-width="1.5"/>'
-                ),
-            ]
+        svg.append(
+            f'<circle{latest} cx="{x:.1f}" '
+            f'cy="{y:.1f}" r="5" '
+            f'fill="{marker}" stroke="#101d30" '
+            'stroke-width="1.5"/>'
         )
 
     hits = sum(shots)
     count = len(shots)
     heading = html.escape(heading)
 
-    svg.extend(
-        [
-            (
-                f'<text x="297" y="71" fill="#acc6da" '
-                'font-family="Arial" font-size="14" '
-                f'font-weight="bold">{heading}</text>'
-            ),
-            (
-                f'<text x="297" y="125" fill="#ffffff" '
-                'font-family="Arial" font-size="48" '
-                f'font-weight="900">{hits} / {count}</text>'
-            ),
-            (
-                '<text x="297" y="151" fill="#d6e7f2" '
-                'font-family="Arial" font-size="13">'
-                'PERFECT 10s</text>'
-            ),
-            (
-                '<circle cx="303" cy="190" r="5" '
-                'fill="#00e4ad"/>'
-                '<text x="316" y="195" fill="#c2d5e4" '
-                'font-family="Arial" font-size="13">'
-                'Perfect 10</text>'
-            ),
-            (
-                '<circle cx="303" cy="220" r="5" '
-                'fill="#ff714b"/>'
-                '<text x="316" y="225" fill="#c2d5e4" '
-                'font-family="Arial" font-size="13">'
-                'Not a 10</text>'
-            ),
-            (
-                '<text x="297" y="262" fill="#9cb8ce" '
-                'font-family="Arial" font-size="11">'
-                'Arrow locations are illustrative</text>'
-            ),
-            "</svg>",
-        ]
-    )
+    svg.extend([
+        f'<text x="297" y="71" fill="#acc6da" '
+        'font-family="Arial" font-size="14" '
+        f'font-weight="bold">{heading}</text>',
+
+        f'<text x="297" y="125" fill="#ffffff" '
+        'font-family="Arial" font-size="48" '
+        f'font-weight="900">{hits} / {count}</text>',
+
+        '<text x="297" y="151" fill="#d6e7f2" '
+        'font-family="Arial" font-size="13">'
+        'PERFECT 10s</text>',
+
+        '<circle cx="303" cy="190" r="5" '
+        'fill="#00e4ad"/>'
+        '<text x="316" y="195" fill="#c2d5e4" '
+        'font-family="Arial" font-size="13">'
+        'Perfect 10</text>',
+
+        '<circle cx="303" cy="220" r="5" '
+        'fill="#ff714b"/>'
+        '<text x="316" y="225" fill="#c2d5e4" '
+        'font-family="Arial" font-size="13">'
+        'Not a 10</text>',
+
+        '<text x="297" y="262" fill="#9cb8ce" '
+        'font-family="Arial" font-size="11">'
+        'Arrow locations are illustrative</text>',
+        '</svg>',
+    ])
 
     components.html(
-        (
-            '<html><body style="margin:0;'
-            'background:transparent;overflow:hidden">'
-            + "".join(svg)
-            + "</body></html>"
-        ),
+        '<html><body style="margin:0;'
+        'background:transparent;overflow:hidden">'
+        + "".join(svg)
+        + '</body></html>',
         height=306,
         scrolling=False,
     )
 
 
-# --------------------------------------------------
-# MEDAL PODIUM
-# --------------------------------------------------
-
-def medal_podium(results):
-    if len(results) < 3:
-        return
-
-    chunks = []
-
-    for pos in [1, 0, 2]:
-        r = results[pos]
-        a = r["athlete"]
-        place = pos + 1
-
-        medal = {
-            1: "🥇",
-            2: "🥈",
-            3: "🥉",
-        }[place]
-
-        chunks.append(
-            f"""
-<div class='podium-entry'>
-    <div class='medal'>{medal}</div>
-    <div class='flag'>{html.escape(a["flag"])}</div>
-    <div class='team'>{html.escape(a["country"])}</div>
-    <div class='archer'>{html.escape(a["athlete"])}</div>
-    <div class='score'>{r["score"]} / 20</div>
-    <div class='podium-block podium-{place}'>
-        {place}
-    </div>
-</div>
-"""
-        )
-
-    st.markdown(
-        '<div class="podium-stage">'
-        + "".join(chunks)
-        + "</div>",
-        unsafe_allow_html=True,
-    )
-
-
-# --------------------------------------------------
-# PROBABILITY AND SIMULATION
-# --------------------------------------------------
-
-def calc_ok(answer, expected):
-    return (
-        answer is not None
-        and abs(float(answer) - expected) <= 0.51
-    )
-
+# ==================================================
+# PROBABILITY
+# ==================================================
 
 def simulate(a, count, rng):
-    """
-    Always use historical data, not student-entered
-    percentages, to determine simulated outcomes.
-    """
     return [
         rng.random() < a["p"]
         for _ in range(count)
@@ -546,16 +418,23 @@ def athlete_label(a):
     )
 
 
-def check_panel(a, prefix):
-    st.markdown(
-        f'**Historical results:** {a["perfect_10s"]} '
-        f'perfect 10s out of {a["arrows"]} '
-        "ranking-round arrows."
+def calc_ok(answer, expected):
+    return (
+        answer is not None
+        and abs(float(answer) - expected) <= .51
+    )
+
+
+def check_panel(a):
+    st.write(
+        f'**Historical results:** '
+        f'{a["perfect_10s"]} perfect 10s '
+        f'out of {a["arrows"]} arrows.'
     )
 
     st.caption(
         "Calculate the probability on your worksheet "
-        "first. Then enter your percentage below."
+        "before entering your percentage."
     )
 
     entered = st.number_input(
@@ -563,44 +442,35 @@ def check_panel(a, prefix):
         min_value=0.0,
         max_value=100.0,
         value=None,
-        step=0.1,
+        step=.1,
         format="%.1f",
-        key=prefix + "_pct",
+        key="my_pct",
         placeholder="Example: 47.2",
     )
 
     if entered is None:
-        st.info(
-            "Enter your answer to check it "
-            "and unlock training."
-        )
+        st.info("Enter your answer to unlock training.")
         return False
 
-    if calc_ok(entered, 100 * a["p"]):
+    if calc_ok(entered, a["p"] * 100):
         st.success(
-            "Correct! Your probability is within "
-            "0.5 percentage points of the historical "
-            "result. Training unlocked."
+            "Correct! Your athlete is unlocked."
         )
         return True
 
     st.warning(
-        "Try again. Divide the number of perfect 10s "
-        "by 72, then multiply by 100. "
-        "Rounding to one decimal is fine."
+        "Try again. Divide perfect 10s by 72 "
+        "and multiply by 100."
     )
-
     return False
 
 
-# --------------------------------------------------
-# STUDENT MODE
-# --------------------------------------------------
+# ==================================================
+# STUDENT TRAINING MODE
+# ==================================================
 
 def student_mode():
-    st.subheader(
-        "🌍 Olympic Village · Choose your country"
-    )
+    st.subheader("🌍 Olympic Village")
 
     options = {
         athlete_label(a): a
@@ -608,19 +478,17 @@ def student_mode():
     }
 
     selection = st.selectbox(
-        "Your assigned country and athlete",
+        "Choose your assigned country",
         list(options),
     )
 
     a = options[selection]
 
-    old = st.session_state.get("student_code")
-
-    if old != a["code"]:
+    if st.session_state.get("student_code") != a["code"]:
         st.session_state.student_code = a["code"]
         st.session_state.training_shots = []
-        st.session_state.training_prediction = None
         st.session_state.training_started = False
+        st.session_state.training_prediction = None
         st.session_state.student_stage = (
             "🔐 Probability Check"
         )
@@ -634,11 +502,6 @@ def student_mode():
         "📋 Results & Reflection",
     ]
 
-    if "student_stage" not in st.session_state:
-        st.session_state.student_stage = stages[0]
-
-    # Navigation is controlled through callbacks.
-    # This prevents StreamlitWidgetAlreadyInstantiatedError.
     stage = st.radio(
         "Your next step",
         stages,
@@ -647,29 +510,15 @@ def student_mode():
     )
 
     if stage == stages[0]:
-
-        unlocked = check_panel(a, "my")
+        unlocked = check_panel(a)
 
         st.markdown(
-            "**Further worksheet questions:** "
-            "Calculate P(not a 10), then predict "
-            "how many perfect 10s you expect "
-            "in 20 arrows."
-        )
-
-        st.caption(
-            "We never change the athlete's underlying "
-            "real-data probability when a student "
-            "enters an answer."
+            "**Worksheet:** Also calculate the "
+            "probability of NOT scoring a perfect 10."
         )
 
         if unlocked:
             st.session_state.athlete_unlocked = True
-
-            st.success(
-                "✅ Athlete unlocked! "
-                "You're ready to practice."
-            )
 
             st.button(
                 "🏹 Continue to Training Camp →",
@@ -681,380 +530,575 @@ def student_mode():
             )
 
     elif stage == stages[1]:
-
-        unlocked = st.session_state.get(
-            "athlete_unlocked",
-            False,
-        )
-
-        if not unlocked:
+        if not st.session_state.get(
+            "athlete_unlocked", False
+        ):
             st.info(
                 "Complete the Probability Check first."
             )
+            return
 
-        else:
-
-            if not st.session_state.get(
-                "training_started",
-                False,
-            ):
-
-                prediction = st.number_input(
-                    "Predict perfect 10s in "
-                    "10 training arrows",
-                    min_value=0,
-                    max_value=10,
-                    value=5,
-                    step=1,
-                    key="predict10",
-                )
-
-                if st.button(
-                    "Start 10-arrow training",
-                    type="primary",
-                ):
-                    st.session_state.training_started = True
-                    st.session_state.training_prediction = (
-                        int(prediction)
-                    )
-                    st.session_state.training_shots = []
-                    st.rerun()
-
-            else:
-
-                shots = st.session_state.training_shots
-
-                st.markdown(
-                    f"""
-<div class="score-strip">
-    <span>
-        TRAINING CAMP · {html.escape(a["country"])}
-        <br>
-        <small>10-arrow practice session</small>
-    </span>
-    <strong>{sum(shots)} / {len(shots)}</strong>
-</div>
-""",
-                    unsafe_allow_html=True,
-                )
-
-                st.progress(len(shots) / 10)
-
-                if shots:
-                    archery_visual(
-                        shots,
-                        heading="TRAINING TARGET",
-                    )
-
-                    history = " ".join(
-                        "🎯" if v else "➖"
-                        for v in shots
-                    )
-
-                    st.markdown(
-                        '<div class="mini-history">'
-                        + history
-                        + "</div>",
-                        unsafe_allow_html=True,
-                    )
-
-                else:
-                    archery_visual(
-                        [],
-                        heading="READY TO SHOOT",
-                    )
-
-                if len(shots) < 10:
-
-                    if st.button(
-                        "Release next arrow 🏹",
-                        type="primary",
-                    ):
-
-                        shot = simulate(
-                            a,
-                            1,
-                            secrets.SystemRandom(),
-                        )[0]
-
-                        st.session_state.training_shots = (
-                            shots + [shot]
-                        )
-
-                        st.rerun()
-
-                else:
-
-                    st.success(
-                        "Training complete: you predicted "
-                        f"{st.session_state.training_prediction} "
-                        "perfect 10s and got "
-                        f"{sum(shots)}."
-                    )
-
-                    st.caption(
-                        "Different results from your "
-                        "prediction are normal in "
-                        "a random simulation."
-                    )
-
-                    # FIX: Callback changes navigation on
-                    # the next rerun instead of modifying
-                    # an already-created widget directly.
-                    st.button(
-                        "📋 Continue to Results & Reflection →",
-                        type="primary",
-                        use_container_width=True,
-                        on_click=lambda: st.session_state.update(
-                            student_stage=stages[2]
-                        ),
-                    )
-
-                    if st.button(
-                        "Run another 10-arrow session"
-                    ):
-                        st.session_state.training_started = False
-                        st.session_state.training_shots = []
-                        st.session_state.training_prediction = None
-                        st.rerun()
-
-    else:
-        # RESULTS & REFLECTION
-
-        shots = st.session_state.get(
-            "training_shots",
-            [],
-        )
-
-        if not shots:
-            st.info(
-                "Complete training to see "
-                "your results here."
+        if not st.session_state.get(
+            "training_started", False
+        ):
+            prediction = st.number_input(
+                "Predict perfect 10s in 10 training arrows",
+                min_value=0,
+                max_value=10,
+                value=5,
+                step=1,
+                key="predict10",
             )
 
+            if st.button(
+                "Start 10-arrow training",
+                type="primary",
+            ):
+                st.session_state.training_started = True
+                st.session_state.training_prediction = (
+                    int(prediction)
+                )
+                st.session_state.training_shots = []
+                st.rerun()
+
         else:
+            shots = st.session_state.training_shots
+
+            st.progress(len(shots) / 10)
 
             archery_visual(
                 shots,
-                heading="YOUR FINAL TARGET",
+                heading="TRAINING TARGET",
             )
 
-            st.write(
-                f"**Your result:** "
-                f"{sum(shots)}/{len(shots)} "
-                "perfect 10s."
+            st.metric(
+                "Perfect 10s",
+                f"{sum(shots)} / {len(shots)}",
             )
 
-            st.write(
-                "**Observed simulation success rate:** "
-                f"{sum(shots)/len(shots)*100:.1f}%"
-            )
+            if len(shots) < 10:
+                if st.button(
+                    "🏹 Release next arrow",
+                    type="primary",
+                ):
+                    shot = simulate(
+                        a, 1, secrets.SystemRandom()
+                    )[0]
 
-            if (
-                st.session_state.get(
-                    "training_prediction"
+                    st.session_state.training_shots = (
+                        shots + [shot]
+                    )
+                    st.rerun()
+
+            else:
+                st.success(
+                    "Training complete! You predicted "
+                    f'{st.session_state.training_prediction} '
+                    f"and scored {sum(shots)}."
                 )
-                is not None
-            ):
-                st.write(
-                    "**Your prediction:** "
-                    f"{st.session_state.training_prediction} "
-                    "out of 10."
+
+                st.button(
+                    "📋 Continue to Results & Reflection →",
+                    type="primary",
+                    use_container_width=True,
+                    on_click=lambda: st.session_state.update(
+                        student_stage=stages[2]
+                    ),
                 )
+
+                if st.button(
+                    "Run another training session"
+                ):
+                    st.session_state.training_started = False
+                    st.session_state.training_shots = []
+                    st.session_state.training_prediction = None
+                    st.rerun()
+
+    else:
+        shots = st.session_state.get(
+            "training_shots", []
+        )
+
+        if not shots:
+            st.info("Complete Training Camp first.")
+            return
+
+        archery_visual(
+            shots,
+            heading="FINAL TRAINING TARGET",
+        )
+
+        st.write(
+            f"**Perfect 10s:** {sum(shots)}/{len(shots)}"
+        )
+
+        st.write(
+            "**Experimental probability:** "
+            f"{sum(shots) / len(shots) * 100:.1f}%"
+        )
+
+        st.write(
+            "**Your prediction:** "
+            f'{st.session_state.training_prediction}/10'
+        )
+
+        st.markdown(
+            "**Reflection:** Why might your simulated "
+            "results differ from the athlete's "
+            "historical Olympic percentage?"
+        )
+
+
+# ==================================================
+# TOURNAMENT ENGINE
+# ==================================================
+
+def new_match(codes, title):
+    return {
+        "codes": list(codes),
+        "title": title,
+        "shots": [[], []],
+        "resolved": False,
+        "winner": None,
+        "loser": None,
+        "shootout": False,
+        "shootout_rounds": 0,
+        "last_reveal": None,
+    }
+
+
+def start_bracket(codes):
+    entries = list(codes)
+    secrets.SystemRandom().shuffle(entries)
+
+    size = 1 << (len(entries) - 1).bit_length()
+    byes = size - len(entries)
+
+    pairs = []
+    remaining = entries[:]
+
+    for i in range(size // 2):
+        if i < byes:
+            pairs.extend([remaining.pop(0), None])
+        else:
+            pairs.extend([
+                remaining.pop(0),
+                remaining.pop(0),
+            ])
+
+    state = {
+        "phase": "knockout",
+        "round_number": 1,
+        "entrants": list(codes),
+        "matches": [],
+        "match_index": 0,
+        "winners": [],
+        "semifinal_losers": [],
+        "medal_queue": [],
+        "medals": {},
+        "history": [],
+    }
+
+    if len(codes) == 2:
+        state["phase"] = "medals"
+        state["medal_queue"] = [
+            new_match(
+                entries,
+                "🥇 GOLD MEDAL FINAL",
+            )
+        ]
+    else:
+        state["matches"] = [
+            new_match(
+                pairs[i:i + 2],
+                f"ROUND 1 · MATCH {i // 2 + 1}",
+            )
+            for i in range(0, size, 2)
+        ]
+
+        skip_byes(state)
+
+    return state
+
+
+def active_match(state):
+    if state["phase"] == "knockout":
+        return state["matches"][
+            state["match_index"]
+        ]
+
+    if state["phase"] == "medals":
+        return state["medal_queue"][0]
+
+    return None
+
+
+def skip_byes(state):
+    while state["phase"] == "knockout":
+        while state["match_index"] < len(
+            state["matches"]
+        ):
+            match = state["matches"][
+                state["match_index"]
+            ]
+
+            present = [
+                code for code in match["codes"]
+                if code is not None
+            ]
+
+            if len(present) == 2:
+                return
+
+            if len(present) == 1:
+                match["resolved"] = True
+                match["winner"] = present[0]
+
+                state["winners"].append(
+                    present[0]
+                )
+
+                state["history"].append(
+                    f"{BY_CODE[present[0]]['country']} "
+                    "advances with a bye"
+                )
+
+            state["match_index"] += 1
+
+        finish_round(state)
+
+
+def finish_round(state):
+    winners = state["winners"][:]
+    state["winners"] = []
+
+    if len(winners) == 2:
+        queue = []
+
+        if len(state["semifinal_losers"]) == 2:
+            queue.append(
+                new_match(
+                    state["semifinal_losers"],
+                    "🥉 BRONZE MEDAL MATCH",
+                )
+            )
+
+        elif (
+            len(state["entrants"]) == 3
+            and len(state["semifinal_losers"]) == 1
+        ):
+            state["medals"]["bronze"] = (
+                state["semifinal_losers"][0]
+            )
+
+        queue.append(
+            new_match(
+                winners,
+                "🥇 GOLD MEDAL FINAL",
+            )
+        )
+
+        state["medal_queue"] = queue
+        state["phase"] = "medals"
+        return
+
+    if len(winners) < 2:
+        raise ValueError(
+            "Knockout bracket lost competitors."
+        )
+
+    state["round_number"] += 1
+
+    state["matches"] = [
+        new_match(
+            winners[i:i + 2],
+            f"ROUND {state['round_number']} "
+            f"· MATCH {i // 2 + 1}",
+        )
+        for i in range(0, len(winners), 2)
+    ]
+
+    state["match_index"] = 0
+    skip_byes(state)
+
+
+# ==================================================
+# ARROW-BY-ARROW MATCHES
+# ==================================================
+
+def fire_pair(state):
+    match = active_match(state)
+
+    a, b = (
+        BY_CODE[c]
+        for c in match["codes"]
+    )
+
+    rng = secrets.SystemRandom()
+
+    pair = [
+        rng.random() < a["p"],
+        rng.random() < b["p"],
+    ]
+
+    for k in range(2):
+        match["shots"][k].append(pair[k])
+
+    match["last_reveal"] = pair
+
+    if len(match["shots"][0]) >= MATCH_ARROWS:
+        score_a, score_b = map(
+            sum, match["shots"]
+        )
+
+        if score_a == score_b:
+            match["shootout"] = True
+        else:
+            resolve_match(
+                state,
+                0 if score_a > score_b else 1,
+            )
+
+
+def fire_shootout(state):
+    match = active_match(state)
+
+    a, b = (
+        BY_CODE[c]
+        for c in match["codes"]
+    )
+
+    rng = secrets.SystemRandom()
+
+    pair = [
+        rng.random() < a["p"],
+        rng.random() < b["p"],
+    ]
+
+    for k in range(2):
+        match["shots"][k].append(pair[k])
+
+    match["last_reveal"] = pair
+    match["shootout_rounds"] += 1
+
+    if pair[0] != pair[1]:
+        resolve_match(
+            state,
+            0 if pair[0] else 1,
+        )
+
+
+def resolve_match(state, index):
+    match = active_match(state)
+
+    winner = match["codes"][index]
+    loser = match["codes"][1 - index]
+
+    match["winner"] = winner
+    match["loser"] = loser
+    match["resolved"] = True
+
+    state["history"].append({
+        "round": match["title"],
+        "winner": winner,
+        "loser": loser,
+        "score": [
+            sum(match["shots"][0][:MATCH_ARROWS]),
+            sum(match["shots"][1][:MATCH_ARROWS]),
+        ],
+        "shootout_rounds": match["shootout_rounds"],
+    })
+
+
+def next_match(state):
+    match = active_match(state)
+
+    if not match or not match["resolved"]:
+        return
+
+    if state["phase"] == "medals":
+        if "BRONZE" in match["title"]:
+            state["medals"]["bronze"] = (
+                match["winner"]
+            )
+        else:
+            state["medals"]["gold"] = match["winner"]
+            state["medals"]["silver"] = match["loser"]
+
+        state["medal_queue"].pop(0)
+
+        if not state["medal_queue"]:
+            state["phase"] = "complete"
+
+        return
+
+    if len(state["matches"]) == 2:
+        state["semifinal_losers"].append(
+            match["loser"]
+        )
+
+    state["winners"].append(
+        match["winner"]
+    )
+
+    state["match_index"] += 1
+    skip_byes(state)
+
+
+# ==================================================
+# MATCH DISPLAY: TWO TARGETS SIDE BY SIDE
+# ==================================================
+
+def match_visual(match):
+    a, b = (
+        BY_CODE[c]
+        for c in match["codes"]
+    )
+
+    scores = [
+        sum(shots)
+        for shots in match["shots"]
+    ]
+
+    st.markdown(
+        f"### {match['title']}"
+    )
+
+    st.caption(
+        "Each click releases one simulated arrow "
+        "from each competitor."
+    )
+
+    col_a, col_b = st.columns(
+        2, gap="small"
+    )
+
+    for k, (col, athlete) in enumerate(
+        zip([col_a, col_b], [a, b])
+    ):
+        with col:
+            st.markdown(
+                f"#### {athlete['flag']} "
+                f"{athlete['country']}"
+            )
+
+            st.caption(athlete["athlete"])
+
+            count = len(
+                match["shots"][k]
+            )
+
+            st.metric(
+                "Perfect 10s",
+                f"{scores[k]} / {count}",
+            )
+
+            archery_visual(
+                match["shots"][k],
+                heading="MATCH TARGET",
+            )
+
+            history = " ".join(
+                "🎯" if hit else "✕"
+                for hit in match["shots"][k]
+            )
 
             st.markdown(
-                "**Discuss:** Why might ten simulated "
-                "shots differ from the athlete's "
-                "percentage based on 72 Olympic arrows?"
+                history or "Ready to shoot"
             )
 
-            st.caption(
-                "Record results on your worksheet. "
-                "Student records are not saved "
-                "across devices or visits."
-            )
-
-
-# --------------------------------------------------
-# CHAMPIONSHIP SIMULATION
-# --------------------------------------------------
-
-def tournament(seed, competitors):
-
-    rng = random.Random(seed)
-    results = []
-
-    for a in competitors:
-
-        shots = simulate(
-            a,
-            ARROWS_IN_CHAMPIONSHIP,
-            rng,
-        )
-
-        results.append(
-            {
-                "athlete": a,
-                "shots": shots,
-                "score": sum(shots),
-                "playoffs": [],
-            }
-        )
-
-    # Tie-breaking playoff arrows.
-
-    for idx in range(3):
-
-        if idx >= len(results):
-            break
-
-        results.sort(
-            key=lambda r: (
-                r["score"],
-                r["playoffs"],
-            ),
-            reverse=True,
-        )
-
-        while True:
-
-            results.sort(
-                key=lambda r: (
-                    r["score"],
-                    r["playoffs"],
-                ),
-                reverse=True,
-            )
-
-            target_key = (
-                results[idx]["score"],
-                tuple(results[idx]["playoffs"]),
-            )
-
-            tied = [
-                r
-                for r in results
-                if (
-                    r["score"],
-                    tuple(r["playoffs"]),
-                ) == target_key
-            ]
-
-            if len(tied) == 1:
-                break
-
-            if len(tied[0]["playoffs"]) >= 200:
-
-                rng.shuffle(tied)
-
-                for k, r in enumerate(tied):
-                    r["playoffs"].append(
-                        int(k == 0)
-                    )
-
-                break
-
-            for r in tied:
-                r["playoffs"].extend(
-                    simulate(
-                        r["athlete"],
-                        1,
-                        rng,
-                    )
-                )
-
-    results.sort(
-        key=lambda r: (
-            r["score"],
-            r["playoffs"],
-        ),
-        reverse=True,
-    )
-
-    return results
-
-
-# --------------------------------------------------
-# CSV EXPORT
-# --------------------------------------------------
-
-def export_results(results):
-
-    import io
-
-    output = io.StringIO()
-
-    writer = csv.writer(output)
-
-    writer.writerow(
-        [
-            "place",
-            "country",
-            "code",
-            "athlete",
-            "perfect_10s_of_20",
-            "playoff_arrows",
+    if match["last_reveal"] is not None:
+        words = [
+            "🎯 PERFECT 10!" if hit
+            else "🏹 Not a 10"
+            for hit in match["last_reveal"]
         ]
-    )
 
-    for n, r in enumerate(results, 1):
-
-        a = r["athlete"]
-
-        writer.writerow(
-            [
-                n,
-                a["country"],
-                a["code"],
-                a["athlete"],
-                r["score"],
-                "".join(
-                    "1" if x else "0"
-                    for x in r["playoffs"]
-                ),
-            ]
+        st.info(
+            f"Last arrows: "
+            f"{a['flag']} {words[0]}"
+            f"   ·   "
+            f"{b['flag']} {words[1]}"
         )
 
-    return output.getvalue().encode("utf-8-sig")
+    if match["shootout_rounds"]:
+        st.warning(
+            "Sudden-death shoot-off: "
+            f"{match['shootout_rounds']} "
+            "extra arrow(s) per country."
+        )
 
 
-# --------------------------------------------------
+# ==================================================
+# MEDAL CEREMONY
+# ==================================================
+
+def medal_podium(gold, silver, bronze):
+    ordered = [
+        (silver, 2, "🥈", "Silver"),
+        (gold, 1, "🥇", "Gold"),
+        (bronze, 3, "🥉", "Bronze"),
+    ]
+
+    chunks = []
+
+    for athlete, place, medal, label in ordered:
+        chunks.append(f"""
+<div class="podium-entry">
+    <div class="medal">{medal}</div>
+    <div class="flag">
+        {html.escape(athlete["flag"])}
+    </div>
+    <div class="team">
+        {html.escape(athlete["country"])}
+    </div>
+    <div class="archer">
+        {html.escape(athlete["athlete"])}
+    </div>
+    <div class="score">{label}</div>
+    <div class="podium-block podium-{place}">
+        {place}
+    </div>
+</div>
+""")
+
+    st.markdown(
+        '<div class="podium-stage">'
+        + "".join(chunks)
+        + "</div>",
+        unsafe_allow_html=True,
+    )
+
+
+# ==================================================
 # TEACHER CHAMPIONSHIP
-# --------------------------------------------------
+# ==================================================
 
 def teacher_mode():
-
     st.subheader(
-        "🏟️ Teacher Championship Control"
+        "🏟️ Teacher Championship"
     )
 
     try:
         teacher_pin = st.secrets.get(
-            "TEACHER_PIN",
-            "",
+            "TEACHER_PIN", ""
         )
     except Exception:
         teacher_pin = ""
 
     if not teacher_pin:
-
         st.error(
-            "Teacher mode is locked until TEACHER_PIN "
-            "is set in Streamlit Cloud secrets."
+            "Set TEACHER_PIN in Streamlit Cloud Secrets."
         )
-
         st.code(
             'TEACHER_PIN = "your-private-pin"',
             language="toml",
         )
-
         return
 
     if not st.session_state.get(
-        "teacher_authenticated",
-        False,
+        "teacher_authenticated", False
     ):
-
         supplied = st.text_input(
             "Teacher PIN",
             type="password",
@@ -1063,197 +1107,243 @@ def teacher_mode():
         if st.button(
             "Unlock teacher dashboard"
         ):
-
             if hmac.compare_digest(
                 str(supplied),
                 str(teacher_pin),
             ):
                 st.session_state.teacher_authenticated = True
                 st.rerun()
-
             else:
                 st.error("Incorrect PIN")
 
         return
 
-    if st.button(
-        "Lock teacher dashboard"
-    ):
-        st.session_state.teacher_authenticated = False
-        st.rerun()
-
-    st.warning(
-        "Teacher mode runs on THIS screen only. "
-        "It does not synchronize results between "
-        "student devices."
+    st.caption(
+        "The teacher controls this tournament "
+        "from one screen. Students can train "
+        "individually on their devices."
     )
 
-    st.markdown(
-        "### Choose the countries competing today"
+    state = st.session_state.get(
+        "live_bracket"
     )
 
-    country_names = {
-        athlete_label(a): a
-        for a in ATHLETES
-    }
+    # ---------- COUNTRY SELECTION ----------
 
-    choices = st.multiselect(
-        "Participating teams (2–24)",
-        options=list(country_names),
-        default=list(country_names)[:10],
-    )
+    if state is None:
+        choices = {
+            athlete_label(a): a["code"]
+            for a in ATHLETES
+        }
 
-    if len(choices) < 2:
-
-        st.info(
-            "Select at least two countries."
+        selected = st.multiselect(
+            "Choose competing countries (2–24)",
+            options=list(choices),
+            default=list(choices)[:8],
+            key="bracket_competitors",
         )
+
+        st.caption(
+            "Countries are shuffled into a "
+            "knockout bracket. Byes are assigned "
+            "when necessary."
+        )
+
+        if st.button(
+            "🏁 Create Olympic Tournament",
+            type="primary",
+            disabled=len(selected) < 2,
+        ):
+            st.session_state.live_bracket = (
+                start_bracket(
+                    [choices[x] for x in selected]
+                )
+            )
+            st.rerun()
+
         return
 
-    st.caption(
-        "Each country receives 20 simulated arrows. "
-        "Perfect 10s are the only modeled score. "
-        "Extra arrows break medal ties."
-    )
+    # ---------- TOURNAMENT CONTROLS ----------
 
-    if st.button(
-        "🏁 Run a NEW championship",
-        type="primary",
-    ):
+    col1, col2 = st.columns([4, 1])
 
-        seed = secrets.randbits(63)
-
-        results = tournament(
-            seed,
-            [
-                country_names[n]
-                for n in choices
-            ],
+    with col1:
+        st.write(
+            f"**Countries entered:** "
+            f"{len(state['entrants'])}"
+            f" · **Match format:** "
+            f"{MATCH_ARROWS} arrows per athlete"
         )
 
-        st.session_state.championship_results = results
+    with col2:
+        if st.button("End Tournament"):
+            st.session_state.live_bracket = None
+            st.rerun()
 
-        st.session_state.championship_country_codes = tuple(
-            country_names[n]["code"]
-            for n in choices
-        )
+    # ---------- COMPLETED CHAMPIONSHIP ----------
 
-    results = st.session_state.get(
-        "championship_results"
-    )
-
-    if results:
-
-        selected = tuple(
-            country_names[n]["code"]
-            for n in choices
-        )
-
-        if selected != st.session_state.get(
-            "championship_country_codes"
-        ):
-
-            st.info(
-                "Selection changed; run a new "
-                "championship to use the new "
-                "country list."
-            )
-
-        st.markdown(
-            "### 🥇 Medal ceremony"
-        )
-
-        if len(results) >= 3:
-            medal_podium(results)
-
-        medals = [
-            "🥇 GOLD",
-            "🥈 SILVER",
-            "🥉 BRONZE",
+    if state["phase"] == "complete":
+        gold = BY_CODE[
+            state["medals"]["gold"]
+        ]
+        silver = BY_CODE[
+            state["medals"]["silver"]
         ]
 
-        cols = st.columns(
-            min(3, len(results))
+        st.balloons()
+
+        st.title(
+            "🏅 OLYMPIC MEDAL CEREMONY"
         )
-
-        for i, col in enumerate(cols):
-
-            with col:
-
-                r = results[i]
-                a = r["athlete"]
-
-                st.markdown(
-                    f"#### {medals[i]}"
-                )
-
-                st.markdown(
-                    f"### {a['flag']} {a['country']}"
-                )
-
-                st.write(
-                    a["athlete"]
-                )
-
-                st.metric(
-                    "Perfect 10s",
-                    f'{r["score"]} / 20',
-                )
 
         st.markdown(
-            "### Final leaderboard"
+            f"## 🥇 {gold['flag']} "
+            f"{gold['country']}"
         )
 
-        for rank, r in enumerate(results, 1):
+        st.markdown(
+            f"### 🥈 {silver['flag']} "
+            f"{silver['country']}"
+        )
 
-            a = r["athlete"]
+        if "bronze" in state["medals"]:
+            bronze = BY_CODE[
+                state["medals"]["bronze"]
+            ]
 
-            tie_note = (
-                " · playoff arrows: "
-                + "".join(
-                    "✓" if x else "×"
-                    for x in r["playoffs"]
-                )
-                if r["playoffs"]
-                else ""
-            )
-
-            st.write(
-                f"**{rank}. {a['flag']} "
-                f"{a['country']}** — "
-                f"{a['athlete']} — "
-                f"**{r['score']}/20** "
-                f"perfect 10s{tie_note}"
+            medal_podium(
+                gold, silver, bronze
             )
 
         st.caption(
-            "Classroom medals are based on this "
-            "simulated event, not actual Paris 2024 "
-            "medals. Student grades should not "
-            "depend on winning."
+            "Classroom medals are simulated "
+            "and are not actual Paris 2024 results."
         )
 
-        st.download_button(
-            "Download leaderboard CSV",
-            data=export_results(results),
-            file_name=(
-                "olympic_archery_classroom_results.csv"
-            ),
-            mime="text/csv",
-        )
+    # ---------- ACTIVE MATCH ----------
 
     else:
+        current = active_match(state)
 
-        st.info(
-            "Choose participating countries "
-            "and run the championship when "
-            "your class is ready."
+        shots_taken = len(
+            current["shots"][0]
         )
 
+        progress = (
+            1.0 if current["resolved"]
+            else min(
+                1.0,
+                shots_taken / MATCH_ARROWS
+            )
+        )
 
-# --------------------------------------------------
-# MAIN APP NAVIGATION
-# --------------------------------------------------
+        st.progress(progress)
+
+        match_visual(current)
+
+        if current["resolved"]:
+            winner = BY_CODE[
+                current["winner"]
+            ]
+
+            st.success(
+                f"🏆 {winner['flag']} "
+                f"{winner['country']} WINS!"
+            )
+
+            if st.button(
+                "➡️ Next Match",
+                type="primary",
+                use_container_width=True,
+            ):
+                next_match(state)
+                st.rerun()
+
+        elif current["shootout"]:
+            st.warning(
+                "TIED AFTER 10 ARROWS! "
+                "Each country shoots again "
+                "until one hits a perfect 10 "
+                "and the other does not."
+            )
+
+            if st.button(
+                "🎯 SHOOT-OFF · Release Both Arrows",
+                type="primary",
+                use_container_width=True,
+            ):
+                fire_shootout(state)
+                st.rerun()
+
+        else:
+            number = shots_taken + 1
+
+            if st.button(
+                f"🏹 RELEASE BOTH ARROWS "
+                f"· ROUND {number}/{MATCH_ARROWS}",
+                type="primary",
+                use_container_width=True,
+            ):
+                fire_pair(state)
+                st.rerun()
+
+    # ---------- TOURNAMENT PROGRESS ----------
+
+    st.divider()
+    st.markdown("#### 📋 Tournament Progress")
+
+    if state["phase"] == "knockout":
+        for match in state["matches"]:
+            names = [
+                BY_CODE[c]["country"]
+                if c else "BYE"
+                for c in match["codes"]
+            ]
+
+            status = (
+                "✅ " + BY_CODE[
+                    match["winner"]
+                ]["country"]
+                if match["resolved"]
+                else "⏳ Waiting"
+            )
+
+            st.write(
+                f"{match['title']}: "
+                f"{names[0]} vs {names[1]} "
+                f"— {status}"
+            )
+
+    for event in state["history"][-16:]:
+        if isinstance(event, str):
+            st.caption(event)
+        else:
+            winner = BY_CODE[
+                event["winner"]
+            ]
+            loser = BY_CODE[
+                event["loser"]
+            ]
+
+            st.write(
+                f"✅ {event['round']}: "
+                f"{winner['flag']} "
+                f"{winner['country']} defeats "
+                f"{loser['country']} "
+                f"— {event['score'][0]} to "
+                f"{event['score'][1]}"
+            )
+
+    st.caption(
+        "The model uses each athlete's probability "
+        "of scoring a perfect 10. It does not "
+        "simulate exact arrow ring scores."
+    )
+
+
+# ==================================================
+# MAIN NAVIGATION
+# ==================================================
 
 mode = st.radio(
     "App mode",
@@ -1272,12 +1362,11 @@ else:
 st.divider()
 
 st.caption(
-    "Dataset: Paris 2024 men's individual recurve "
-    "ranking round, as transcribed into the "
-    "Sports by the Numbers 24-country class cards. "
-    "Each archer took 72 arrows. All new app shots "
-    "use independent Bernoulli trials with "
-    "p = perfect 10s ÷ 72. This simplified model "
-    "does not estimate actual chances of winning "
-    "Olympic medals."
+    "Dataset: Paris 2024 men's individual "
+    "recurve ranking round. Each athlete "
+    "shot 72 arrows. Simulated attempts use "
+    "independent Bernoulli trials with "
+    "p = perfect 10s ÷ 72. "
+    "This is a simplified probability model, "
+    "not an official Olympic scoring simulation."
 )
