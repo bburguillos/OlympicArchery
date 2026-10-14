@@ -1,10 +1,13 @@
 import csv
+import html
+import math
 import hmac
 import random
 import secrets
 from pathlib import Path
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Olympic Archery | Sports by the Numbers", page_icon="🏹", layout="wide")
 
@@ -26,15 +29,96 @@ BY_CODE = {a["code"]: a for a in ATHLETES}
 
 st.markdown("""
 <style>
-.block-container{padding-top:1.5rem;max-width:1150px}
-.huge{font-size:2.3rem;font-weight:900;letter-spacing:.02em}
-.smallnote{opacity:.78;font-size:.88rem}
-.hero{border-radius:18px;padding:20px 25px;background:linear-gradient(110deg,#25344b,#1c2c40 65%,#59402c);margin-bottom:14px;border:1px solid #3d4d62}
-.result-chip{border-radius:12px;padding:10px;text-align:center;border:1px solid #6f7c8c;background:#25354c;font-size:1.5rem}
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=DM+Sans:wght@400;500;700&display=swap');
+:root{--orange:#fbbf62;--deep:#10233c}
+.block-container{padding-top:1.15rem;max-width:1200px}
+.hero{border-radius:24px;padding:26px 30px;background:linear-gradient(115deg,#0d1b30 0%,#183953 70%,#8c4b21 100%);color:#fff!important;margin-bottom:18px;border:1px solid rgba(255,255,255,.16);box-shadow:0 12px 35px rgba(0,0,0,.14)}
+.hero .eyebrow{font:700 12px 'DM Sans',sans-serif;letter-spacing:3px;color:#fbd09b}
+.hero .huge{font:900 clamp(35px,5vw,64px) 'Barlow Condensed',sans-serif;letter-spacing:1px;line-height:1.03;margin:5px 0 9px}
+.hero .subtitle{font:500 14px 'DM Sans',sans-serif;color:#d9e4f0}
+.country-card{background:linear-gradient(135deg,#152c45,#244866);border:1px solid #4b7393;border-radius:17px;padding:18px 22px;color:white;margin:12px 0}
+.country-card .country-head{display:flex;align-items:center;gap:16px}
+.country-card .flag{font-size:48px;line-height:1.1}
+.country-card .country{font:900 32px 'Barlow Condensed',sans-serif;line-height:1.15}
+.country-card .athlete{font:500 15px 'DM Sans',sans-serif;color:#d5e7f6}
+.country-card .stats{display:flex;gap:14px;flex-wrap:wrap;margin-top:14px;border-top:1px solid #547089;padding-top:13px;font-size:13px;color:#eaf3fb}
+.step-note{padding:10px 14px;border-radius:11px;background:rgba(114,142,164,.13);border-left:4px solid #ed9a40;margin:10px 0;font-size:14px}
+.score-strip{background:#152d46;color:white;border-radius:16px;padding:17px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0}
+.score-strip strong{font:900 31px 'Barlow Condensed',sans-serif;color:#ffd189}
+.mini-history{font-size:21px;letter-spacing:6px;padding:8px 2px}
+.podium-stage{display:flex;justify-content:center;align-items:flex-end;gap:10px;padding:24px 8px 12px;background:linear-gradient(#0e233a,#204663);border-radius:22px;margin:14px 0 20px;min-height:340px}
+.podium-entry{flex:1;min-width:0;text-align:center;color:#fff}
+.podium-entry .flag{font-size:clamp(28px,4vw,54px)}
+.podium-entry .medal{font-size:25px}
+.podium-entry .team{font:800 clamp(16px,2.4vw,28px) 'Barlow Condensed',sans-serif;overflow-wrap:anywhere}
+.podium-entry .archer{font:500 12px 'DM Sans',sans-serif;opacity:.85;margin-bottom:8px}
+.podium-entry .score{font:800 23px 'Barlow Condensed',sans-serif;margin:5px 0}
+.podium-block{display:flex;align-items:center;justify-content:center;border-radius:10px 10px 0 0;color:#12263b;font:900 44px 'Barlow Condensed',sans-serif}
+.podium-1{height:132px;background:linear-gradient(135deg,#ffe399,#b88723)}
+.podium-2{height:92px;background:linear-gradient(135deg,#ecf3fb,#889cac)}
+.podium-3{height:65px;background:linear-gradient(135deg,#f0bf8a,#9c632f)}
+@media(max-width:620px){.hero{padding:22px 19px}.podium-stage{gap:4px;padding:16px 4px 8px}.podium-entry .archer{font-size:10px}.podium-entry .score{font-size:17px}.country-card .country{font-size:25px}}
 </style>
 """, unsafe_allow_html=True)
-st.markdown('<div class="hero"><div class="huge">🏹 OLYMPIC ARCHERY · ROAD TO GOLD</div><div>Sports by the Numbers · Paris 2024 athlete data · Classroom probability simulator</div></div>', unsafe_allow_html=True)
-st.caption("Real Olympic data powers the probabilities; all training and championship shots are NEW computer simulations, not historical Olympic results.")
+st.markdown('<div class="hero"><div class="eyebrow">DOVER TIGERS · SPORTS BY THE NUMBERS</div><div class="huge">🏹 ROAD TO GOLD</div><div class="subtitle">OLYMPIC ARCHERY CHAMPIONSHIP · Paris 2024 probability lab</div></div>', unsafe_allow_html=True)
+st.caption("Olympic results determine the model probability. Every in-app arrow and medal result is a new classroom simulation, not an Olympic replay.")
+
+
+def country_card(a):
+    flag=html.escape(a['flag']); country=html.escape(a['country']); athlete=html.escape(a['athlete'])
+    st.markdown(f"""<div class='country-card'><div class='country-head'><div class='flag'>{flag}</div><div><div class='country'>{country}</div><div class='athlete'>{athlete} · Paris 2024</div></div></div><div class='stats'><span>🎯 PERFECT 10s: <b>{a['perfect_10s']}</b></span><span>🏹 ARROWS SHOT: <b>{a['arrows']}</b></span><span>📍 MEN'S RECURVE RANKING ROUND</span></div></div>""",unsafe_allow_html=True)
+
+
+def archery_visual(shots, heading='LIVE TARGET', compact=False):
+    """A binary-outcome visualization. Marker locations illustrative, not actual arrow scores."""
+    W=680; H=400 if not compact else 330
+    cx=220 if not compact else 190; cy=200 if not compact else 166
+    rr=168 if not compact else 139
+    # Olympic-style rings for context, never labels for simulated per-ring scores.
+    colors=['#f8f8f2','#171b23','#29a6da','#d93431','#ffd549']
+    svg=[f'<svg viewBox="0 0 {W} {H}" width="100%" height="100%" role="img" aria-label="Archery target with simulated perfect ten and non-ten markers">',
+         '<style>@keyframes arrowLand{from{opacity:0;transform:scale(2)}to{opacity:1;transform:scale(1)}}.latest{animation:arrowLand .55s ease-out;transform-box:fill-box;transform-origin:center}</style>',
+         f'<rect width="{W}" height="{H}" rx="20" fill="#11253e"/>',
+         f'<circle cx="{cx}" cy="{cy}" r="{rr+11}" fill="#0a1625" stroke="#6595b2" stroke-width="2"/>']
+    for i,col in enumerate(colors):
+        r=rr*(1-i*.19)
+        svg.append(f'<circle cx="{cx}" cy="{cy}" r="{r:.1f}" fill="{col}" stroke="#203046" stroke-width="2"/>')
+    # Central perfect-10 visual threshold (only center is a success).
+    ten_radius=rr*.20
+    svg.extend([f'<circle cx="{cx}" cy="{cy}" r="{ten_radius:.1f}" fill="#ffd549" stroke="#141719" stroke-width="2"/>',
+                f'<circle cx="{cx}" cy="{cy}" r="{ten_radius*.3:.1f}" fill="none" stroke="#1b2127" stroke-width="1.5"/>',
+                f'<line x1="{cx-rr-14}" y1="{cy}" x2="{cx+rr+14}" y2="{cy}" stroke="#11243b" stroke-opacity=".15"/>'])
+    # Deterministic presentation coordinates, not independently generated scores.
+    for i,success in enumerate(shots):
+        theta=i*2.39996322973+0.4
+        if success:
+            rad=ten_radius*(.22+.49*((i*7)%11)/11)
+        else:
+            rad=ten_radius+11+(rr-ten_radius-28)*((i*13+7)%29)/29
+        x=cx+rad*math.cos(theta); y=cy+rad*math.sin(theta)
+        latest=' class="latest"' if i==len(shots)-1 else ''
+        svg.extend([f'<line{latest} x1="{x-13:.1f}" y1="{y-13:.1f}" x2="{x+2:.1f}" y2="{y+2:.1f}" stroke="#172c41" stroke-width="3"/>',
+                    f'<circle{latest} cx="{x:.1f}" cy="{y:.1f}" r="5.2" fill="{("#00e4ad" if success else "#ff714b")}" stroke="#101d30" stroke-width="1.6"/>'])
+    hits=sum(shots); count=len(shots)
+    svg.extend([f'<text x="435" y="90" fill="#acc6da" font-family="Arial" font-size="17" font-weight="bold">{html.escape(heading)}</text>',
+                f'<text x="435" y="156" fill="#ffffff" font-family="Arial" font-size="58" font-weight="900">{hits} / {count}</text>',
+                '<text x="435" y="187" fill="#d6e7f2" font-family="Arial" font-size="15">PERFECT 10s</text>',
+                f'<text x="435" y="252" fill="#c2d5e4" font-family="Arial" font-size="14">● Green = perfect 10</text>',
+                f'<text x="435" y="281" fill="#c2d5e4" font-family="Arial" font-size="14">● Orange = not 10</text>',
+                f'<text x="435" y="316" fill="#8dabc4" font-family="Arial" font-size="12">Visual landing spots are illustrative</text>',
+                '</svg>'])
+    markup=''.join(svg)
+    components.html(f'<div style="max-width:100%;overflow:hidden">{markup}</div>',height=H+3,scrolling=False)
+
+
+def medal_podium(results):
+    if len(results)<3:return
+    chunks=[]
+    for pos in [1,0,2]:
+        r=results[pos];a=r['athlete'];place=pos+1
+        medal={1:'🥇',2:'🥈',3:'🥉'}[place]
+        chunks.append(f"""<div class='podium-entry'><div class='medal'>{medal}</div><div class='flag'>{html.escape(a['flag'])}</div><div class='team'>{html.escape(a['country'])}</div><div class='archer'>{html.escape(a['athlete'])}</div><div class='score'>{r['score']} / 20</div><div class='podium-block podium-{place}'>{place}</div></div>""")
+    st.markdown('<div class="podium-stage">'+''.join(chunks)+'</div>',unsafe_allow_html=True)
 
 
 def calc_ok(answer, expected):
@@ -47,13 +131,12 @@ def simulate(a, count, rng):
 
 
 def target(success, key=""):
-    # Decorative target depicts perfect-10 vs not-10 only. Does not invent exact ring scores.
     if success is None:
-        st.markdown("<div style='text-align:center;font-size:5rem'>🎯</div>", unsafe_allow_html=True)
+        archery_visual([],heading="READY TO SHOOT")
     elif success:
-        st.success("🎯 PERFECT 10! The simulated arrow hit the center.")
+        st.success("🎯 PERFECT 10! A simulated arrow hit the center.")
     else:
-        st.info("🏹 Not a perfect 10 this time. Exact ring points are not modeled.")
+        st.info("🏹 Not a perfect 10. Exact ring points are not modeled.")
 
 
 def athlete_label(a):
@@ -87,7 +170,7 @@ def student_mode():
         st.session_state.training_started = False
         st.session_state.student_stage = "🔐 Probability Check"
         st.session_state.athlete_unlocked = False
-    st.write(f'**Athlete:** {a["athlete"]}  ·  **Country:** {a["flag"]} {a["country"]}  ·  **Competition:** Paris 2024 men’s individual recurve ranking round')
+    country_card(a)
     stages = ["🔐 Probability Check", "🏹 Training Camp", "📋 Results & Reflection"]
     if "student_stage" not in st.session_state:
         st.session_state.student_stage = stages[0]
@@ -114,12 +197,12 @@ def student_mode():
                     st.rerun()
             else:
                 shots = st.session_state.training_shots
-                st.metric("Training score", f"{sum(shots)} perfect 10s / {len(shots)} arrows")
+                st.markdown(f'<div class="score-strip"><span>TRAINING CAMP · {html.escape(a["country"])}<br><small>10-arrow practice session</small></span><strong>{sum(shots)} / {len(shots)}</strong></div>', unsafe_allow_html=True)
                 st.progress(len(shots)/10)
                 if shots:
-                    target(shots[-1]); st.write(' '.join('🎯' if v else '➖' for v in shots))
+                    archery_visual(shots,heading='TRAINING TARGET'); st.markdown('<div class="mini-history">'+' '.join('🎯' if v else '➖' for v in shots)+'</div>',unsafe_allow_html=True)
                 else:
-                    target(None)
+                    archery_visual([],heading="READY TO SHOOT")
                 if len(shots)<10:
                     if st.button("Release next arrow 🏹",type="primary"):
                         shot=simulate(a,1,secrets.SystemRandom())[0]
@@ -128,6 +211,9 @@ def student_mode():
                 else:
                     st.success(f'Training complete: you predicted {st.session_state.training_prediction} perfect 10s and got {sum(shots)}.')
                     st.caption("Different results from your prediction are normal in a random simulation.")
+                    if st.button("📋 Continue to Results & Reflection →",type="primary"):
+                        st.session_state.student_stage = stages[2]
+                        st.rerun()
                     if st.button("Run another 10-arrow session"):
                         st.session_state.training_started=False
                         st.session_state.training_shots=[]
@@ -138,6 +224,7 @@ def student_mode():
         if not shots:
             st.info("Complete training to see your results here.")
         else:
+            archery_visual(shots,heading="YOUR FINAL TARGET")
             st.write(f'**Your result:** {sum(shots)}/{len(shots)} perfect 10s.')
             st.write(f'**Observed simulation success rate:** {sum(shots)/len(shots)*100:.1f}%')
             if st.session_state.get("training_prediction") is not None:
@@ -213,6 +300,8 @@ def teacher_mode():
         if selected!=st.session_state.get("championship_country_codes"):
             st.info("Selection changed; run a new championship to use the new country list.")
         st.markdown("### 🥇 Medal ceremony")
+        if len(results)>=3:
+            medal_podium(results)
         medals=['🥇 GOLD','🥈 SILVER','🥉 BRONZE']
         cols=st.columns(min(3,len(results)))
         for i,col in enumerate(cols):
