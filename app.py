@@ -241,4 +241,3 @@ else:
 
 st.divider()
 st.caption("Dataset: Paris 2024 men's individual recurve ranking round, as transcribed into the Sports by the Numbers 24-country class cards. Each archer took 72 arrows. All new app shots use independent Bernoulli trials with p = perfect 10s ÷ 72. This simplified model does not estimate actual chances of winning Olympic medals.")
-
