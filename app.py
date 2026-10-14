@@ -273,109 +273,77 @@ def tournament(seed, competitors):
 MATCH_ARROWS = 10
 
 
+
+# ==================================================
+# V5 · SIMULTANEOUS OLYMPIC BROADCAST TOURNAMENT
+# ==================================================
+
+st.markdown("""
+<style>
+.broadcast-banner{background:linear-gradient(110deg,#132d47,#23557c);color:#fff;
+ border:1px solid #557a9a;border-radius:15px;padding:12px 17px;margin:9px 0 13px}
+.broadcast-banner .big{font:900 clamp(25px,3vw,37px) 'Barlow Condensed',Arial,sans-serif}
+.broadcast-banner .sub{color:#c1d9e7;font-size:12px;letter-spacing:1px}
+.stButton>button[kind=primary]{min-height:53px;font-weight:800;border-radius:12px}
+</style>""", unsafe_allow_html=True)
+
+
 def new_match(codes, title):
     return {"codes": list(codes), "title": title, "shots": [[], []],
             "resolved": False, "winner": None, "loser": None,
-            "shootout": False, "shootout_rounds": 0, "last_reveal": None}
+            "shootout": False, "shootout_rounds": 0, "last_reveal": None,
+            "bye": None}
 
 
 def start_bracket(codes):
+    if len(codes) < 2 or len(codes) > 24 or len(set(codes)) != len(codes):
+        raise ValueError("Select 2 to 24 different countries.")
     entries = list(codes)
     secrets.SystemRandom().shuffle(entries)
+    state = {"phase": "knockout", "round_number": 1, "entrants": entries[:],
+             "matches": [], "semifinal_losers": [], "medals": {},
+             "history": [], "ceremony_step": 0}
+    if len(entries) == 2:
+        state["phase"] = "medals"
+        state["matches"] = [new_match(entries, "🥇 GOLD FINAL")]
+        return state
     size = 1 << (len(entries) - 1).bit_length()
-    # Distribute byes among pairs, so no match has two empty entries.
     byes = size - len(entries)
-    entries_with_byes = []
-    extra = entries[:]
+    matches = []
     for i in range(size // 2):
         if i < byes:
-            entries_with_byes.extend([extra.pop(0), None])
+            m = new_match([entries.pop(0), None], f"ROUND 1 · MATCH {i+1}")
+            m["resolved"] = True
+            m["winner"] = m["codes"][0]
+            m["bye"] = True
         else:
-            entries_with_byes.extend([extra.pop(0), extra.pop(0)])
-    state = {"phase": "knockout", "round_number": 1,
-             "entrants": list(codes), "matches": [], "match_index": 0,
-             "winners": [], "semifinal_losers": [], "medal_queue": [],
-             "medals": {}, "history": []}
-    if len(codes) == 2:
-        state["phase"] = "medals"
-        state["medal_queue"] = [new_match(entries, "🥇 GOLD MEDAL FINAL")]
-    else:
-        state["matches"] = [new_match(entries_with_byes[i:i+2],
-                         f"ROUND 1 · MATCH {i//2+1}")
-                          for i in range(0, size, 2)]
-        skip_byes(state)
+            m = new_match([entries.pop(0), entries.pop(0)], f"ROUND 1 · MATCH {i+1}")
+        matches.append(m)
+    state["matches"] = matches
     return state
 
 
-def active_match(state):
-    if state["phase"] == "knockout":
-        return state["matches"][state["match_index"]]
-    if state["phase"] == "medals":
-        return state["medal_queue"][0]
-    return None
-
-
-def skip_byes(state):
-    # Automatically progress competitors who draw a bye.
-    while state["phase"] == "knockout":
-        while state["match_index"] < len(state["matches"]):
-            match = state["matches"][state["match_index"]]
-            present = [c for c in match["codes"] if c is not None]
-            if len(present) == 2:
-                return
-            if len(present) == 1:
-                match["resolved"] = True
-                match["winner"] = present[0]
-                state["winners"].append(present[0])
-                state["history"].append(f"{BY_CODE[present[0]]['country']} advances with a bye")
-            state["match_index"] += 1
-        finish_round(state)
-
-
-def finish_round(state):
-    winners = state["winners"][:]
-    state["winners"] = []
-    if len(winners) == 2:
-        # Semifinals are complete. Bronze is played before the gold final.
-        queue = []
-        if len(state["semifinal_losers"]) == 2:
-            queue.append(new_match(state["semifinal_losers"], "🥉 BRONZE MEDAL MATCH"))
-        elif len(state["entrants"]) == 3 and len(state["semifinal_losers"]) == 1:
-            # Three-team field: the other finalist received a bye;
-            # the sole semifinal loser takes bronze automatically.
-            state["medals"]["bronze"] = state["semifinal_losers"][0]
-        queue.append(new_match(winners, "🥇 GOLD MEDAL FINAL"))
-        state["medal_queue"] = queue
-        state["phase"] = "medals"
+def shot_pair(match):
+    if match["resolved"]:
         return
-    if len(winners) < 2:
-        raise ValueError("Knockout bracket lost competitors.")
-    state["round_number"] += 1
-    state["matches"] = [new_match(winners[i:i+2],
-                        f"ROUND {state['round_number']} · MATCH {i//2+1}")
-                        for i in range(0, len(winners), 2)]
-    state["match_index"] = 0
-    skip_byes(state)
-
-
-def fire_pair(state):
-    match = active_match(state)
     a, b = (BY_CODE[c] for c in match["codes"])
     rng = secrets.SystemRandom()
     pair = [rng.random() < a["p"], rng.random() < b["p"]]
     for k in range(2):
         match["shots"][k].append(pair[k])
     match["last_reveal"] = pair
-    if len(match["shots"][0]) >= MATCH_ARROWS:
-        score_a, score_b = map(sum, match["shots"])
-        if score_a == score_b:
-            match["shootout"] = True
-        else:
-            resolve_match(state, 0 if score_a > score_b else 1)
+    if len(match["shots"][0]) < MATCH_ARROWS:
+        return
+    score = [sum(s[:MATCH_ARROWS]) for s in match["shots"]]
+    if score[0] != score[1]:
+        settle_match(match, 0 if score[0] > score[1] else 1)
+    else:
+        match["shootout"] = True
 
 
-def fire_shootout(state):
-    match = active_match(state)
+def shootout_pair(match):
+    if match["resolved"] or not match["shootout"]:
+        return
     a, b = (BY_CODE[c] for c in match["codes"])
     rng = secrets.SystemRandom()
     pair = [rng.random() < a["p"], rng.random() < b["p"]]
@@ -384,264 +352,276 @@ def fire_shootout(state):
     match["last_reveal"] = pair
     match["shootout_rounds"] += 1
     if pair[0] != pair[1]:
-        resolve_match(state, 0 if pair[0] else 1)
+        settle_match(match, 0 if pair[0] else 1)
 
 
-def resolve_match(state, index):
-    match = active_match(state)
-    win = match["codes"][index]
-    lose = match["codes"][1-index]
-    match["winner"] = win
-    match["loser"] = lose
+def settle_match(match, winning_index):
     match["resolved"] = True
-    state["history"].append({
-        "round": match["title"], "winner": win, "loser": lose,
-        "score": [sum(match["shots"][0][:MATCH_ARROWS]),
-                  sum(match["shots"][1][:MATCH_ARROWS])],
-        "shootout_rounds": match["shootout_rounds"],
-    })
+    match["winner"] = match["codes"][winning_index]
+    match["loser"] = match["codes"][1-winning_index]
+    match["shootout"] = False
 
 
-def next_match(state):
-    match = active_match(state)
-    assert match and match["resolved"]
-    if state["phase"] == "medals":
-        if "BRONZE" in match["title"]:
-            state["medals"]["bronze"] = match["winner"]
-        else:
-            state["medals"]["gold"] = match["winner"]
-            state["medals"]["silver"] = match["loser"]
-        state["medal_queue"].pop(0)
-        if not state["medal_queue"]:
-            state["phase"] = "complete"
-        return
-    # For the semifinals, save both losers for the bronze match.
-    if len(state["matches"]) == 2:
-        state["semifinal_losers"].append(match["loser"])
-    state["winners"].append(match["winner"])
-    state["match_index"] += 1
-    skip_byes(state)
-
-
-def match_visual(match):
-    a, b = (BY_CODE[c] for c in match["codes"])
-    scores = [sum(s) for s in match["shots"]]
-    st.markdown(f"### {match['title']}")
-    st.caption("Press **Release both arrows** to reveal one shot from each country. Each arrow uses its own athlete's real 2024 perfect-10 rate.")
-    cols = st.columns(2, gap="small")
-    for k, (col, athlete) in enumerate(zip(cols, [a, b])):
-        with col:
-            st.markdown(f"#### {athlete['flag']} {athlete['country']}")
-            st.caption(athlete["athlete"])
-            n = len(match["shots"][k])
-            st.metric("Perfect 10s", f"{scores[k]} / {n}")
-            archery_visual(match["shots"][k], heading="MATCH TARGET", compact=True)
-            st.markdown(" ".join("🎯" if hit else "✕" for hit in match["shots"][k]) or "Ready to shoot")
-    if match["last_reveal"] is not None:
-        words = ["🎯 PERFECT 10!" if hit else "🏹 Not a 10" for hit in match["last_reveal"]]
-        st.info(f"Last arrows: {a['flag']} {words[0]}   ·   {b['flag']} {words[1]}")
-    if match["shootout_rounds"]:
-        st.warning(f"Sudden-death shoot-off: {match['shootout_rounds']} extra arrow(s) per country.")
-
-
-
-# ==================================================
-# V4: TOURNAMENT BROADCAST DISPLAY
-# ==================================================
-
-st.markdown("""
-<style>
-.match-head {padding:15px 20px; background:linear-gradient(90deg,#102d4c,#234663);
- border:1px solid #58728b;border-radius:16px;color:white;text-align:center;margin:12px 0}
-.match-head .round {font-size:12px;letter-spacing:3px;color:#ffdb96;font-weight:800}
-.match-head .countries {font-size:clamp(20px,3vw,38px);font-weight:900;letter-spacing:.3px}
-.match-head .versus {color:#ffbd65;padding:0 12px;font-size:18px}
-.score-fight {display:flex;justify-content:center;align-items:center;gap:22px;
- background:#0b243c;color:white;padding:12px;border-radius:14px;margin:8px 0 12px}
-.score-fight .score {font-size:clamp(35px,5vw,64px);font-weight:900;line-height:1}
-.score-fight .center {font-size:13px;text-transform:uppercase;letter-spacing:2px;color:#c8d6e1;text-align:center}
-.score-fight .leading {color:#ffd078}
-.dramatic-banner {background:linear-gradient(110deg,#612b16,#a24b15);border:2px solid #f7c86d;
- padding:15px;border-radius:14px;color:#fff;text-align:center;font-size:clamp(17px,2.5vw,27px);font-weight:800;margin:12px 0}
-.tournament-board {border:1px solid #385673;background:#122b45;color:#fff;
- padding:16px;border-radius:16px;margin:12px 0}
-.tournament-board .label {font-size:12px;font-weight:900;color:#ffcf78;letter-spacing:2px;margin-bottom:8px}
-.tournament-board .matchline {font-size:14px;padding:8px;border-bottom:1px solid #34536d}
-.ceremony {background:linear-gradient(135deg,#102640,#38527c,#8b5f21);border:2px solid #e4c379;
- color:white;padding:25px;border-radius:20px;text-align:center;margin:16px 0}
-.ceremony .big {font-size:clamp(28px,5vw,52px);font-weight:900}
-.ceremony .country {font-size:clamp(24px,3.5vw,43px);font-weight:800}
-</style>
-""", unsafe_allow_html=True)
-
-
-def country_short(code):
-    if code is None:
-        return "BYE"
-    a = BY_CODE[code]
-    return f"{a['flag']} {html.escape(a['country'])}"
-
-
-def round_overview(state):
-    if state["phase"] == "complete":
-        return
-    if state["phase"] == "medals":
-        matches = state["medal_queue"]
-        label = "MEDAL MATCHES"
-    else:
-        matches = state["matches"]
-        label = f"ROUND {state['round_number']} · BRACKET"
-    lines=[]
-    for m in matches:
-        left,right=(country_short(c) for c in m["codes"])
+def advance_all_arrows(state):
+    # All unfinished real matches advance by exactly one pair of arrows.
+    for m in state["matches"]:
         if m["resolved"]:
-            status = "🏁 " + country_short(m["winner"]) + " advances"
+            continue
+        if m["shootout"]:
+            shootout_pair(m)
         else:
-            status = "⏳ Up next" if m is active_match(state) else "Upcoming"
-        lines.append(f'<div class="matchline">{left} <b>vs</b> {right} · {status}</div>')
-    st.markdown('<div class="tournament-board"><div class="label">'+label+'</div>'+''.join(lines)+'</div>',unsafe_allow_html=True)
+            shot_pair(m)
 
 
-def broadcast_match(match):
-    a,b=(BY_CODE[c] for c in match["codes"])
-    count=len(match["shots"][0]); scores=[sum(x) for x in match["shots"]]
-    title=html.escape(match['title'])
-    st.markdown(f"""<div class="match-head"><div class="round">{title}</div>
-    <div class="countries">{country_short(a['code'])}<span class="versus">VS</span>{country_short(b['code'])}</div> </div>""",unsafe_allow_html=True)
-    leading=max(scores)
-    c0=' leading' if scores[0]>scores[1] else ''
-    c1=' leading' if scores[1]>scores[0] else ''
-    st.markdown(f"""<div class="score-fight"><div class="score{c0}">{scores[0]}</div>
-    <div class="center">PERFECT 10s<br/>ARROW {min(count,10)} / 10<br/>
-{('SHOOT-OFF' if match['shootout'] else 'LIVE')}</div>
-    <div class="score{c1}">{scores[1]}</div> </div>""",unsafe_allow_html=True)
-    col1,col2=st.columns(2,gap='small')
-    for col,a_,shots in ((col1,a,match['shots'][0]),(col2,b,match['shots'][1])):
-        with col:
-            st.markdown(f"**{a_['flag']} {a_['country']}** · {a_['athlete']}")
-            archery_visual(shots,heading="LIVE MATCH",compact=True)
-            st.caption(' '.join('🎯' if x else '➖' for x in shots) or 'Awaiting opening arrow')
-    if match['last_reveal'] is not None:
-        p=match['last_reveal']
-        result=lambda x: 'PERFECT 10 🎯' if x else 'NOT A 10'
-        st.markdown(f"**Most recent arrows:** {a['flag']} {result(p[0])}  |  {b['flag']} {result(p[1])}")
-    if not match['resolved']:
-        left=10-count
-        if match['shootout']:
-            st.markdown('<div class="dramatic-banner">⚡ SUDDEN DEATH — ONE PERFECT 10 CAN DECIDE IT!</div>',unsafe_allow_html=True)
-        elif 0<left<=3:
-            st.markdown(f'<div class="dramatic-banner">🔥 FINAL {left} ARROW{"S" if left!=1 else ""} — THE MEDALS ARE ON THE LINE!</div>',unsafe_allow_html=True)
-        elif count and scores[0]==scores[1]:
-            st.info('Dead even! Each next arrow could change the match.')
-        elif count:
-            leader=a if scores[0]>scores[1] else b
-            st.info(f"{leader['flag']} {leader['country']} leads by {abs(scores[0]-scores[1])} perfect 10(s).")
+def round_finished(state):
+    return bool(state["matches"]) and all(m["resolved"] for m in state["matches"])
 
 
-def ceremony_reveal(state):
-    phase=st.session_state.get('ceremony_step',0)
-    medals=state['medals']
-    st.title('🏟️ THE OLYMPIC MEDAL CEREMONY')
-    if phase==0:
-        st.markdown('<div class="ceremony"><div class="big">THE FINAL RESULTS ARE IN.</div><p>Who will stand on the podium?</p></div>',unsafe_allow_html=True)
+def finish_round(state):
+    if not round_finished(state):
+        return
+    for m in state["matches"]:
+        state["history"].append({"title": m["title"], "codes": m["codes"][:],
+            "winner": m["winner"], "score": [sum(x[:MATCH_ARROWS]) for x in m["shots"]],
+            "shootout": m["shootout_rounds"], "bye": bool(m["bye"])})
+    if state["phase"] == "medals":
+        for m in state["matches"]:
+            if "BRONZE" in m["title"]:
+                state["medals"]["bronze"] = m["winner"]
+            else:
+                state["medals"]["gold"] = m["winner"]
+                state["medals"]["silver"] = m["loser"]
+        state["phase"] = "complete"
+        return
+    matches = state["matches"]
+    winners = [m["winner"] for m in matches]
+    if len(matches) == 2:
+        state["semifinal_losers"] = [m["loser"] for m in matches if m["loser"]]
+    if len(winners) == 2:
+        medal_matches = []
+        if len(state["semifinal_losers"]) == 2:
+            medal_matches.append(new_match(state["semifinal_losers"], "🥉 BRONZE MATCH"))
+        elif len(state["entrants"]) == 3 and len(state["semifinal_losers"]) == 1:
+            state["medals"]["bronze"] = state["semifinal_losers"][0]
+        medal_matches.append(new_match(winners, "🥇 GOLD FINAL"))
+        state["matches"] = medal_matches
+        state["phase"] = "medals"
+    else:
+        state["round_number"] += 1
+        state["matches"] = [new_match(winners[i:i+2],
+            f'ROUND {state["round_number"]} · MATCH {i//2+1}')
+            for i in range(0, len(winners), 2)]
+
+
+def target_svg(shots, radius=54):
+    # Small, inline SVG: full target always fits in its own compact box.
+    colors = [(52, "#f0eee9"), (42, "#1e2530"), (32, "#28a5d7"),
+              (22, "#e13d3b"), (12, "#fbd44f")]
+    bits = ['<svg viewBox="0 0 120 120" style="width:100%;max-width:155px;'
+            'height:auto;display:block;margin:auto" role="img" aria-label="Simulated arrows">']
+    for r, color in colors:
+        bits.append(f'<circle cx="60" cy="60" r="{r}" fill="{color}" stroke="#172c42" stroke-width="1"/>')
+    for i, hit in enumerate(shots[-20:]):
+        angle = i * 2.39996323
+        if hit:
+            dist = 3 + (i * 5) % 7
+        else:
+            dist = 15 + (i * 7) % 35
+        x, y = 60 + dist * math.cos(angle), 60 + dist * math.sin(angle)
+        color = "#04dba4" if hit else "#ff714b"
+        bits.append(f'<circle cx="{x:.2f}" cy="{y:.2f}" r="3.2" fill="{color}" stroke="#0e2530" stroke-width="1"/>')
+    bits.append('</svg>')
+    return ''.join(bits)
+
+
+def one_match_html(m, idx):
+    if m["bye"]:
+        a = BY_CODE[m["winner"]]
+        return (f'<div class="match"><div class="match-label">MATCH {idx+1} · BYE</div>'
+                f'<div class="bye">{html.escape(a["flag"])} {html.escape(a["country"])} '
+                'automatically advances</div></div>')
+    cards = []
+    for k, code in enumerate(m["codes"]):
+        a = BY_CODE[code]
+        s = m["shots"][k]
+        last = ("🎯" if s[-1] else "✕") if s else "—"
+        winning = ' winner' if m["resolved"] and code == m["winner"] else ''
+        cards.append(f"""<div class="athlete{winning}">
+            <div class="flag">{html.escape(a['flag'])}</div>
+            <div class="name">{html.escape(a['country'])}</div>
+            <div class="person">{html.escape(a['athlete'])}</div>
+            {target_svg(s)}
+            <div class="score">{sum(s[:MATCH_ARROWS])} <span>/ {min(len(s),MATCH_ARROWS)}</span></div>
+            <div class="last">LAST: {last}</div>
+        </div>""")
+    status = ('🏁 WINNER: ' + html.escape(BY_CODE[m['winner']]['country'])
+              if m["resolved"] else '⚡ SHOOT-OFF' if m["shootout"] else
+              f'ARROW {len(m["shots"][0]) + 1} OF {MATCH_ARROWS}')
+    return (f'<div class="match"><div class="match-label">{html.escape(m["title"])}</div>'
+            '<div class="competitors">' + ''.join(cards) + '</div>'
+            f'<div class="status">{status}</div></div>')
+
+
+def broadcast_grid(state):
+    matches = state["matches"]
+    n = len(matches)
+    label = ("MEDAL MATCHES" if state["phase"] == "medals" else
+             f'ROUND {state["round_number"]} · LIVE COMPETITION')
+    unresolved = [m for m in matches if not m["resolved"]]
+    normal_remaining = [max(0, MATCH_ARROWS-len(m["shots"][0])) for m in unresolved if not m["shootout"]]
+    bottom = ('EVERY MATCH COMPLETE — ADVANCE TO NEXT STAGE' if not unresolved else
+              'SUDDEN-DEATH SHOOT-OFF' if any(m["shootout"] for m in unresolved) else
+              f'{max(normal_remaining,default=0)} ARROWS REMAINING')
+    st.markdown(f"""<div class="broadcast-banner"><div class="sub">OLYMPIC PROBABILITY ARENA · LIVE</div>
+        <div class="big">{label}</div><div class="sub">{bottom} · {len(unresolved)} MATCH(ES) STILL LIVE</div></div>""",
+        unsafe_allow_html=True)
+    # A single embedded grid prevents Streamlit elements/iframes from stretching the screen.
+    cols = 2 if n >= 2 else 1
+    html_doc = f"""<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+    <style>
+    *{{box-sizing:border-box}}html,body{{margin:0;background:transparent;font-family:Arial,sans-serif;color:#fff}}
+    .grid{{display:grid;grid-template-columns:repeat({cols},minmax(0,1fr));gap:10px}}
+    .match{{background:linear-gradient(145deg,#132940,#1d4262);border:1px solid #42617e;border-radius:15px;
+     padding:9px;min-width:0;overflow:hidden}}
+    .match-label{{font-weight:800;color:#f6c988;letter-spacing:.5px;font-size:12px;min-height:20px}}
+    .competitors{{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}}
+    .athlete{{background:#0c2033;border:1px solid #284d69;border-radius:9px;text-align:center;min-width:0;padding:4px}}
+    .athlete.winner{{border:2px solid #f5c56d}}
+    .flag{{font-size:22px;line-height:24px}}
+    .name{{font-weight:800;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+    .person{{font-size:10px;color:#bdd1de;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+    .score{{font-size:25px;font-weight:900;line-height:26px;color:#fff}}
+    .score span{{color:#9cbed0;font-size:13px}}.last{{font-size:10px;color:#bbd7e7}}
+    .status{{text-align:center;color:#f5ca8a;font-size:11px;font-weight:800;padding:5px 1px 1px}}
+    .bye{{font-size:18px;text-align:center;padding:70px 5px 80px}}
+    @media(max-width:600px){{.grid{{grid-template-columns:1fr}}}}
+    </style></head><body><div class="grid">"""+ ''.join(one_match_html(m,i) for i,m in enumerate(matches)) + '</div></body></html>'
+    # Height scales with compact 2-column card rows; no scroll within board.
+    rows = (n+cols-1)//cols
+    components.html(html_doc, height=rows*300+20, scrolling=False)
+
+
+def ceremony_reveal_v5(state):
+    step = state["ceremony_step"]
+    medals = state["medals"]
+    st.title('🏟️ OLYMPIC MEDAL CEREMONY')
+    def medal_line(key, symbol):
+        a = BY_CODE[medals[key]]
+        st.markdown(f'### {symbol} {a["flag"]} {a["country"]} — {a["athlete"]}')
+    if step == 0:
+        st.info('The medalists have been decided. Are you ready to reveal the podium?')
         if st.button('🥉 Reveal Bronze' if 'bronze' in medals else '🥈 Reveal Silver',type='primary',use_container_width=True):
-            st.session_state.ceremony_step=1;st.rerun()
+            state['ceremony_step'] = 1
+            st.rerun()
         return
     if 'bronze' in medals:
-        a=BY_CODE[medals['bronze']]
-        st.markdown(f'<div class="ceremony">🥉 BRONZE MEDAL<div class="country">{country_short(a["code"])}</div><div>{html.escape(a["athlete"])}</div></div>',unsafe_allow_html=True)
-    if phase==1 and 'bronze' in medals:
-        if st.button('🥈 Reveal Silver',type='primary',use_container_width=True):
-            st.session_state.ceremony_step=2;st.rerun()
+        medal_line('bronze','🥉')
+        if step == 1:
+            if st.button('🥈 Reveal Silver',type='primary',use_container_width=True):
+                state['ceremony_step'] = 2
+                st.rerun()
+            return
+    else:
+        if step == 1:
+            state['ceremony_step'] = 2
+            st.rerun()
+    medal_line('silver','🥈')
+    if step == 2:
+        if st.button('🥇 REVEAL GOLD',type='primary',use_container_width=True):
+            state['ceremony_step'] = 3
+            st.rerun()
         return
-    if phase==1 and 'bronze' not in medals:
-        phase=2
-    silver=BY_CODE[medals['silver']]
-    st.markdown(f'<div class="ceremony">🥈 SILVER MEDAL<div class="country">{country_short(silver["code"])}</div><div>{html.escape(silver["athlete"])}</div></div>',unsafe_allow_html=True)
-    if phase==2:
-        if st.button('🥇 REVEAL OLYMPIC GOLD',type='primary',use_container_width=True):
-            st.session_state.ceremony_step=3;st.rerun()
-        return
-    gold=BY_CODE[medals['gold']]
+    medal_line('gold','🥇')
     st.balloons()
-    st.markdown(f'<div class="ceremony">🏆 🥇 OLYMPIC GOLD 🥇 🏆<div class="big">{country_short(gold["code"])}</div><div>{html.escape(gold["athlete"])}</div></div>',unsafe_allow_html=True)
     if 'bronze' in medals:
-        bronze=BY_CODE[medals['bronze']]
-        medal_podium([{'athlete':gold,'score':'Gold'},{'athlete':silver,'score':'Silver'},{'athlete':bronze,'score':'Bronze'}])
-    st.caption('These medals are awarded in the classroom probability simulation—not at Paris 2024.')
+        medal_podium([{'athlete':BY_CODE[medals['gold']],'score':'Gold'},
+                      {'athlete':BY_CODE[medals['silver']],'score':'Silver'},
+                      {'athlete':BY_CODE[medals['bronze']],'score':'Bronze'}])
+    st.caption('These are simulated classroom medals, not actual Paris 2024 results.')
 
 
 def teacher_mode():
-    st.subheader('🏟️ Teacher Championship · Live Knockout Tournament')
+    st.subheader('🏟️ Teacher Championship · Simultaneous Broadcast')
     try:
-        teacher_pin=st.secrets.get('TEACHER_PIN','')
+        teacher_pin = st.secrets.get('TEACHER_PIN','')
     except Exception:
-        teacher_pin=''
+        teacher_pin = ''
     if not teacher_pin:
         st.error('Set TEACHER_PIN in Streamlit Cloud Secrets.')
-        st.code('TEACHER_PIN = "your-private-pin"',language='toml')
         return
     if not st.session_state.get('teacher_authenticated',False):
-        supplied=st.text_input('Teacher PIN',type='password')
+        supplied = st.text_input('Teacher PIN',type='password')
         if st.button('Unlock teacher dashboard'):
             if hmac.compare_digest(str(supplied),str(teacher_pin)):
-                st.session_state.teacher_authenticated=True;st.rerun()
-            else:st.error('Incorrect PIN')
+                st.session_state.teacher_authenticated=True
+                st.rerun()
+            else:
+                st.error('Incorrect PIN')
         return
-    state=st.session_state.get('live_bracket')
+    state = st.session_state.get('live_bracket')
     if state is None:
-        choices={athlete_label(a):a['code'] for a in ATHLETES}
-        selected=st.multiselect('Choose competing countries (2–24)',list(choices),default=list(choices)[:8],key='bracket_competitors')
-        st.caption('Knockout bracket; byes are assigned where necessary. Classroom results use the real Olympic perfect-10 rates as model probabilities.')
+        choices = {athlete_label(a):a['code'] for a in ATHLETES}
+        selected = st.multiselect('Choose competing countries (2–24)',list(choices),
+                                  default=list(choices)[:8],key='bracket_competitors')
+        st.caption('All matches in each knockout round run simultaneously. Byes advance automatically.')
         if st.button('🏁 Create Olympic Tournament',type='primary',disabled=len(selected)<2):
             st.session_state.live_bracket=start_bracket([choices[x] for x in selected])
-            st.session_state.ceremony_step=0
             st.rerun()
         return
-    top1,top2=st.columns([4,1])
-    with top1: st.write(f"**{len(state['entrants'])} countries entered** · 10 arrows per competitor per match · Teacher-controlled")
+    top1,top2 = st.columns([4,1])
+    with top1:
+        st.write(f'**{len(state["entrants"])} countries** · '
+                 f'**{len(state["matches"])} matches this round** · Teacher-controlled')
     with top2:
         if st.button('End Tournament'):
             st.session_state.live_bracket=None
-            st.session_state.ceremony_step=0
             st.rerun()
     if state['phase']=='complete':
-        ceremony_reveal(state)
+        ceremony_reveal_v5(state)
     else:
-        current=active_match(state)
-        round_overview(state)
-        st.progress(1.0 if current['resolved'] else min(1.0,len(current['shots'][0])/MATCH_ARROWS))
-        broadcast_match(current)
-        if current['resolved']:
-            winner=BY_CODE[current['winner']]
-            st.markdown(f'<div class="dramatic-banner">🏆 {html.escape(winner["flag"])} {html.escape(winner["country"])} WINS THE MATCH!</div>',unsafe_allow_html=True)
-            if st.button('➡️ Advance to Next Match',type='primary',use_container_width=True):
-                next_match(state)
+        broadcast_grid(state)
+        if round_finished(state):
+            if st.button('➡️ ADVANCE ALL WINNERS',type='primary',use_container_width=True):
+                finish_round(state)
                 st.rerun()
-        elif current['shootout']:
-            if st.button('⚡ RELEASE SUDDEN-DEATH ARROWS',type='primary',use_container_width=True):
-                fire_shootout(state);st.rerun()
         else:
-            count=len(current['shots'][0])
-            label=f'🏹 RELEASE BOTH ARROWS · {count+1} / 10'
-            if count>=7:label=f'🔥 FINAL ARROWS · RELEASE {count+1} / 10'
+            unresolved = [m for m in state['matches'] if not m['resolved']]
+            shootouts = any(m['shootout'] for m in unresolved)
+            label = '⚡ RELEASE SHOOT-OFF ARROWS' if shootouts else '🏹 RELEASE ALL ARROWS · NEXT ROUND'
             if st.button(label,type='primary',use_container_width=True):
-                fire_pair(state);st.rerun()
-    with st.expander('📋 Completed match results',expanded=False):
-        if not state['history']:
-            st.write('No completed matches yet.')
+                advance_all_arrows(state)
+                st.rerun()
+            # A multi-shot control is useful when the classroom needs to move quickly.
+            if not shootouts:
+                if st.button('⏩ FAST-FORWARD 3 ARROWS',use_container_width=True):
+                    for _ in range(3):
+                        if round_finished(state):
+                            break
+                        advance_all_arrows(state)
+                    st.rerun()
+            if any(m['resolved'] for m in state['matches']):
+                st.caption('Finished matches remain frozen while other matches finish their arrows or shoot-offs.')
+    with st.expander('📋 Completed rounds and results'):
         for event in state['history']:
-            if isinstance(event,str):st.caption(event)
+            a=BY_CODE[event['winner']]
+            if event['bye']:
+                st.write(f'{event["title"]}: {a["flag"]} {a["country"]} received a bye')
             else:
-                a=BY_CODE[event['winner']];b=BY_CODE[event['loser']]
-                st.write(f"{event['round']}: **{a['flag']} {a['country']}** defeated {b['country']} · {event['score'][0]}–{event['score'][1]}"+(f" · {event['shootout_rounds']} shoot-off round(s)" if event['shootout_rounds'] else ''))
-    st.caption('Probability model: each arrow independently scores a perfect 10 with p = athlete perfect 10s / 72. Other ring scores are not modeled. Tournament is local to this teacher session.')
+                c0,c1=event['codes']
+                st.write(f'{event["title"]}: {BY_CODE[c0]["country"]} '
+                         f'{event["score"][0]} – {event["score"][1]} {BY_CODE[c1]["country"]} '
+                         f'· winner {a["flag"]} {a["country"]}'
+                         + (' (shoot-off)' if event['shootout'] else ''))
+    st.caption('Probability model: each arrow independently scores a perfect 10 with '
+               'p = Olympic athlete perfect 10s / 72. The positions of arrow marks are illustrative.')
 
-mode=st.radio("App mode",["🎓 Student Training","🏆 Teacher Championship"],horizontal=True)
+
+mode = st.radio('App mode',['🎓 Student Training','🏆 Teacher Championship'],horizontal=True)
 if mode.startswith('🎓'):
     student_mode()
 else:
     teacher_mode()
-
 st.divider()
-st.caption("Dataset: Paris 2024 men's individual recurve ranking round, as transcribed into the Sports by the Numbers 24-country class cards. Each archer took 72 arrows. All new app shots use independent Bernoulli trials with p = perfect 10s ÷ 72. This simplified model does not estimate actual chances of winning Olympic medals.")
+st.caption('Dataset: Paris 2024 men’s individual recurve ranking round. '
+           'This classroom tournament models perfect 10 versus not 10, not full Olympic point scoring. '
+           'Teacher tournament state is local to this browser session.')
